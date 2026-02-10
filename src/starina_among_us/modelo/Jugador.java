@@ -9,9 +9,10 @@ import javax.swing.JPanel;
 public class Jugador {
     
     // ATRIBUTOS
+    private int id;
     private String nombre;
-    private int x, y;
-    private int velocidad;
+    private double x, y;
+    private double velocidad;
     private boolean estaVivo;
     private boolean esImpostor;
     
@@ -27,7 +28,7 @@ public class Jugador {
     private final int ANCHO = 50; 
     private final int ALTO = 60;
 
-    public Jugador(String nombre, int x, int y, boolean esImpostor) {
+    public Jugador(int id, String nombre, double x, double y, boolean esImpostor) {
         this.nombre = nombre;
         this.x = x;
         this.y = y;
@@ -44,7 +45,7 @@ public class Jugador {
         }
     }
 
-    public void mover(int dx, int dy) {
+    public void mover(double dx, double dy) {
         if (estaVivo) {
             this.x += dx * velocidad;
             this.y += dy * velocidad;
@@ -68,6 +69,7 @@ public class Jugador {
     }
     
     public void dibujar(Graphics g, JPanel panelObservador) {
+        
         Image imagenActual;
         
         if (!estaVivo) {
@@ -81,23 +83,25 @@ public class Jugador {
         if (imagenActual != null) {
             // TRUCO DEL ESPEJO:
             if (mirandoDerecha) {
-                // Dibujo normal: (x, y) con ancho positivo
-                g.drawImage(imagenActual, x, y, ANCHO, ALTO, panelObservador);
+                
+                g.drawImage(imagenActual, (int)x, (int)y, ANCHO, ALTO, panelObservador);
             } else {
-                // Dibujo invertido: Empezamos en (x + ANCHO) y dibujamos hacia atrás con ancho negativo
-                g.drawImage(imagenActual, x + ANCHO, y, -ANCHO, ALTO, panelObservador);
+               
+                g.drawImage(imagenActual, (int)x + ANCHO, (int)y, -ANCHO, ALTO, panelObservador);
             }
             
             g.setColor(Color.WHITE);
-            g.drawString(nombre, x + 10, y - 5);
+            
+            g.drawString(nombre, (int)x + 10, (int)y - 5);
         } else {
             g.setColor(Color.MAGENTA);
-            g.fillRect(x, y, ANCHO, ALTO);
+            
+            g.fillRect((int)x, (int)y, ANCHO, ALTO);
         }
     }
 
-    public int getX() { return x; }
-    public int getY() { return y; }
+    public double getX() { return x; }
+    public double getY() { return y; }
     public boolean isVivo() { return estaVivo; }
     public void setVivo(boolean vivo) { this.estaVivo = vivo; }
 }
