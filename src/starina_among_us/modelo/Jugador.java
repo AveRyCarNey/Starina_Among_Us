@@ -47,8 +47,14 @@ public class Jugador {
 
     public void mover(double dx, double dy) {
         if (estaVivo) {
-            this.x += dx * velocidad;
-            this.y += dy * velocidad;
+            double nuevaX = this.x + (dx * velocidad);
+            double nuevaY = this.y + (dy * velocidad);
+            
+            // LÍMITES (Suponiendo ventana de 800x600 aprox)
+            // Math.max(0, ...) impide que baje de 0
+            // Math.min(740, ...) impide que pase de 740
+            this.x = Math.max(0, Math.min(740, nuevaX));
+            this.y = Math.max(0, Math.min(500, nuevaY));
             
             // LÓGICA DE VOLTEAR
             if (dx > 0) {
@@ -102,6 +108,13 @@ public class Jugador {
 
     public double getX() { return x; }
     public double getY() { return y; }
+    public int getId() {
+        return this.id;
+    }
+    public void setX(double x) { this.x = x; }
+    public void setY(double y) { this.y = y; }
     public boolean isVivo() { return estaVivo; }
     public void setVivo(boolean vivo) { this.estaVivo = vivo; }
+
+    
 }

@@ -67,6 +67,17 @@ public class ClienteRed extends Thread {
                     double y = Double.parseDouble(partes[3]);
                     panel.actualizarJugadorRemoto(id, x, y);
                 }
+                else if (comando.equals("MATAR")) {
+                    // Mensaje: "MATAR,ID_VICTIMA"
+                    int idMuerto = Integer.parseInt(partes[1]);
+                    
+                    // Avisamos al panel para que actualice el sprite
+                    panel.reportarMuerte(idMuerto);
+                }
+                else if (comando.equals("SALIO")) {
+                    int idQueSeFue = Integer.parseInt(partes[1]);
+                    panel.eliminarJugador(idQueSeFue);
+                }
             }
         } catch (Exception e) {
             System.out.println("Desconectado");

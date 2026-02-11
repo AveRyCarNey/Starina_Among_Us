@@ -8,13 +8,16 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
+import javax.swing.JButton;
 import java.util.HashMap;
 import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import javax.swing.Timer;
+import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import starina_among_us.red.ClienteRed;
 
-public class PanelJuego extends JPanel implements KeyListener, ActionListener {
+public class PanelJuego extends JPanel implements KeyListener, ActionListener, FocusListener {
 
     private Jugador miJugador;
     // Motor del juego: Controla los FPS y el ciclo de actualización
@@ -34,39 +37,62 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener {
     
     // Banderas para saber qué teclas están presionadas
     private boolean arriba, abajo, izquierda, derecha;
+    
+    // Para detectar cuando frenamos
+    private boolean estabaMoviendose = false; 
+    
+    private JButton botonKill;
+    private int idVictimaCercana = -1; // Guardaremos aquí a quién vamos a matar
 
     public PanelJuego() {
+        this.setLayout(null);
         this.setBackground(Color.DARK_GRAY);
         this.setFocusable(true);
         this.addKeyListener(this);
+        this.addFocusListener(this);
 
-        // 1. Inicializar la base de datos de jugadores vacía
+        // Inicializar la base de datos de jugadores vacía
         jugadoresConectados = new HashMap<>();
 
-        // 2. Definir mi identidad temporal (El servidor debería asignar esto en el futuro)
-        miId = 1; 
 
-        // 3. Crear mi personaje local y guardarlo en la lista
-        // (ID, Nombre, X, Y, esImpostor)
-        Jugador yo = new Jugador(miId, "Starina", 100.0, 100.0, false);
-        jugadoresConectados.put(miId, yo);
-
-        // 4. Cargar el mapa desde los recursos
+        // Cargar el mapa desde los recursos
         try {
             fondoMapa = new ImageIcon(getClass().getResource("/starina_among_us/recursos/mapas/Cafeteria.png")).getImage();
         } catch (Exception e) {
             System.out.println("Error cargando mapa");
         }
 
-        // 5. Iniciar la conexión con el servidor
+        // Iniciar la conexión con el servidor
         clienteRed = new ClienteRed(this);
-        clienteRed.enviar("HOLA"); // Protocolo de saludo inicial
 
-        // 6. Arrancar el ciclo de juego (aprox. 60 FPS)
+        // Arrancar el ciclo de juego (aprox. 60 FPS)
         reloj = new Timer(15, this);
         reloj.start();
-        clienteRed = new ClienteRed(this); // Iniciar conexión
-clienteRed.enviar("HOLA, SOY NUEVO"); // Saludar al entrar
+        
+        
+        // --- CONFIGURACIÓN DEL BOTÓN KILL ---
+        botonKill = new JButton("MATAR");
+        botonKill.setBounds(650, 450, 100, 50); // Posición (esquina inferior derecha)
+        botonKill.setBackground(Color.RED);
+        botonKill.setForeground(Color.WHITE);
+        botonKill.setVisible(false); // Empieza invisible (hasta que sepamos si somos impostor)
+        botonKill.setEnabled(false); // Empieza desactivado (hasta que haya alguien cerca)
+        
+        // ACCIÓN AL HACER CLIC
+        botonKill.addActionListener(e -> {
+            if (idVictimaCercana != -1) {
+                clienteRed.enviar("MATAR," + idVictimaCercana);
+                botonKill.setEnabled(false);
+                
+                // --- ARREGLO DEL BUG DE CAMINAR ---
+                // 1. Apagamos todas las teclas por seguridad
+                arriba = false; abajo = false; izquierda = false; derecha = false;
+                
+                // 2. Le decimos al Panel: "¡Mírame a mí otra vez!" (Recuperar el foco)
+                this.requestFocusInWindow(); 
+            }
+        });
+         this.add(botonKill); // Añadir el botón a la pantalla
     }
 
     @Override
@@ -79,13 +105,7 @@ clienteRed.enviar("HOLA, SOY NUEVO"); // Saludar al entrar
         }
         
         // 2. DIBUJAR JUGADORES
-        
-        // --- ERROR AQUÍ ---
-        // Seguramente tienes esta línea escrita:
-        // miJugador.dibujar(g, this);  <-- ¡BORRA ESTA LÍNEA!
-        // Esa variable está vacía (null) y por eso explota.
-        
-        // --- LO CORRECTO ---
+         
         // Debemos dibujar solo a los que están en la lista (que te incluye a ti)
         for (Jugador j : jugadoresConectados.values()) {
             j.dibujar(g, this);
@@ -95,27 +115,75 @@ clienteRed.enviar("HOLA, SOY NUEVO"); // Saludar al entrar
     // --- CICLO DEL JUEGO (Lo que hace el reloj cada 15ms) ---
     @Override
     public void actionPerformed(ActionEvent e) {
+        // VALIDACIÓN DE SEGURIDAD
+        if (!jugadoresConectados.containsKey(miId)) return;
+        
         Jugador miMuñeco = jugadoresConectados.get(miId);
         
-        if (miMuñeco != null) {
-            double dx = 0, dy = 0;
-            if (izquierda) dx = -0.7;
-            if (derecha)   dx = -0.7; // OJO: Corregir si copiaste mal, derecha es 1
-            if (derecha)   dx = 0.7;
-            if (arriba)    dy = -0.7;
-            if (abajo)     dy = 0.7;
+        // --- LOGICA DE MOVIMIENTO ---
+        int dx = 0, dy = 0;
+        if (izquierda) dx = -1;
+        if (derecha)   dx = 1;
+        if (arriba)    dy = -1;
+        if (abajo)     dy = 1;
 
-            // Si hay movimiento...
-            if (dx != 0 || dy != 0) {
-                // 1. Me muevo yo en mi pantalla (para que sea instantáneo)
-                miMuñeco.mover(dx, dy);
-                
-                // 2. LE GRITO AL MUNDO DÓNDE ESTOY
-                // Formato: "MOV,MiID,MiX,MiY"
-                String mensaje = "MOV," + miId + "," + miMuñeco.getX() + "," + miMuñeco.getY();
+        // ¿Me estoy moviendo ahora mismo?
+        boolean meMuevoAhora = (dx != 0 || dy != 0);
+
+        if (meMuevoAhora) {
+            // A) SI ME MUEVO:
+            miMuñeco.mover(dx, dy); // Mover localmente
+            
+            // Avisar al servidor (usamos (int) para enviar coordenadas limpias)
+            String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
+            clienteRed.enviar(mensaje);
+            
+            estabaMoviendose = true; // Marcar que me estaba moviendo
+            
+        } else {
+            // B) SI NO TOCO TECLAS:
+            miMuñeco.detener(); // Detener animación local
+            
+            // C) ¡EL FRENO DE MANO! (IMPORTANTE)
+            // Si en el frame anterior me movía, y ahora NO, significa que ACABO de frenar.
+            // Tengo que enviar un ÚLTIMO mensaje con mi posición final exacta.
+            if (estabaMoviendose) {
+                String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
                 clienteRed.enviar(mensaje);
+                estabaMoviendose = false; // Ya avisé, apago la bandera
+            }
+        }
+        
+        
+        // --- NUEVO: RADAR DE ASESINO ---
+        // Solo si soy impostor y el botón está visible
+        if (botonKill.isVisible()) {
+            Jugador yo = jugadoresConectados.get(miId);
+            double distanciaMinima = 10000;
+            Jugador victimaPotencial = null;
+            
+            // Buscar la víctima más cercana
+            for (Jugador otro : jugadoresConectados.values()) {
+                // Reglas: No puedo matarme a mí mismo, ni a otros impostores (opcional), ni a muertos
+                if (otro.getId() != miId && otro.isVivo()) {
+                    
+                    // Fórmula de distancia (Pitágoras)
+                    double distancia = Math.hypot(otro.getX() - yo.getX(), otro.getY() - yo.getY());
+                    
+                    if (distancia < 60) { // 60 píxeles de rango
+                        distanciaMinima = distancia;
+                        victimaPotencial = otro;
+                    }
+                }
+            }
+            
+            // Si encontramos a alguien cerca...
+            if (victimaPotencial != null) {
+                botonKill.setEnabled(true);
+                idVictimaCercana = victimaPotencial.getId(); // Guardamos su ID para el clic
             } else {
-                miMuñeco.detener();
+                botonKill.setEnabled(false);
+                idVictimaCercana = -1;
             }
         }
         repaint();
@@ -160,7 +228,14 @@ clienteRed.enviar("HOLA, SOY NUEVO"); // Saludar al entrar
             double dy = y - j.getY();
             
             // Aplicar movimiento visual
-            j.mover(dx/5.0, dy/5.0); 
+            // Si la distancia es muy pequeña (menos de 0.5 píxeles), lo forzamos a estar QUIETO.
+            if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
+                j.detener();          // Corta el GIF
+                j.setX(x); j.setY(y); // Lo teletransporta al píxel exacto para corregir errores
+            } else {
+                // Si la distancia es grande, lo movemos suavemente
+                j.mover(dx/5.0, dy/5.0); 
+            }
             
             // Forzar sincronización exacta si la desincronización es muy grande
             // (Opcional: j.setX(x); j.setY(y); si tuvieras los setters)
@@ -186,8 +261,63 @@ clienteRed.enviar("HOLA, SOY NUEVO"); // Saludar al entrar
         
         jugadoresConectados.put(miId, yo);
         System.out.println("¡Soy el ID " + id + "! Rol: " + (esImpostor ? "IMPOSTOR" : "TRIPULANTE"));
+        
+        //Si se es impostor, aparecera el boton
+        if (esImpostor) {
+            botonKill.setVisible(true);
+        }
     }
     
-    
+    public void reportarMuerte(int idMuerto) {
+        if (jugadoresConectados.containsKey(idMuerto)) {
+            Jugador j = jugadoresConectados.get(idMuerto);
+            j.setVivo(false); // Esto cambiará su imagen a "muerto" automáticamente
+            
+            System.out.println("El jugador " + idMuerto + " ha sido asesinado.");
+            
+            // Si yo soy el que murió, podría bloquear mi movimiento o mostrar un mensaje "GAME OVER"
+            if (idMuerto == miId) {
+                // Opcional: decirle al usuario que murió
+            }
+        }
+        repaint();
+    }
         
+    
+    public void eliminarJugador(int id) {
+    if (jugadoresConectados.containsKey(id)) {
+        jugadoresConectados.remove(id);
+        repaint(); // Redibujar para que desaparezca
+    }
+}
+    
+    
+    @Override
+    public void focusGained(FocusEvent e) {
+        // Cuando vuelves a hacer clic en la ventana. 
+        // No hace falta hacer nada especial aquí.
+    }
+
+    @Override
+    public void focusLost(FocusEvent e) {
+        // ¡EMERGENCIA! El usuario hizo clic en otra ventana.
+        // Soltamos todas las teclas virtualmente para que no se quede pegado.
+        derecha = false;
+        izquierda = false;
+        arriba = false;
+        abajo = false;
+        
+        // Forzamos al muñeco a detenerse
+        if (jugadoresConectados.containsKey(miId)) {
+            Jugador miMuñeco = jugadoresConectados.get(miId);
+            miMuñeco.detener();
+            
+            // Enviamos un último mensaje al servidor diciendo "ME DETUVE"
+            // para que los demás no me vean caminando infinito.
+            String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
+            clienteRed.enviar(mensaje);
+        }
+        
+        repaint();
+    }
 }
