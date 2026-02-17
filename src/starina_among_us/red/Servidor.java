@@ -26,7 +26,7 @@ public class Servidor {
                 // 1. SORTEO: ¿Será impostor? (20% de probabilidad)
                 // Math.random() da un número entre 0.0 y 1.0
                 //boolean esImpostor = Math.random() < 0.2; 
-                boolean esImpostor = true;
+                boolean esImpostor = Math.random() < 0.3;
                 // 2. ASIGNAR ID y ROL
                 int idAsignado = contadorIds++;
                 

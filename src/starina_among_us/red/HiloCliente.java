@@ -17,6 +17,10 @@ public class HiloCliente extends Thread {
     
     // El servidor necesita recordar dónde está este jugador
     private double x, y;
+    
+    private boolean estaVivo = true;
+    
+    private int r = 255, g = 0, b = 0;
 
     public HiloCliente(Socket socket, ArrayList<HiloCliente> lista, int id, boolean impostor) {
         this.socket = socket;
@@ -39,15 +43,26 @@ public class HiloCliente extends Thread {
             // 1. BIENVENIDA: Le decimos al nuevo quién es
             this.enviarMensaje("BIENVENIDO," + id + "," + esImpostor + "," + x + "," + y);
 
-            // --- NUEVO: ACTUALIZACIÓN DE ESTADO ---
+            // --- ACTUALIZACIÓN DE ESTADO ---
             // Le contamos al nuevo dónde están los jugadores VIEJOS
             for (HiloCliente otro : listaTodos) {
                 if (otro.id != this.id) {
-                    // "Oye nuevo, el jugador 'otro' está en tal posición"
+                    // Le decimos dónde está
                     this.enviarMensaje("MOV," + otro.id + "," + otro.x + "," + otro.y);
+                    // Le decimos su color
+                    this.enviarMensaje("COLOR," + otro.id + "," + otro.r + "," + otro.g + "," + otro.b);
                     
-                    // Y de paso, le avisamos al viejo que llegó uno nuevo
+                    // NUEVO: Le decimos SU ROL (Para que sepa si es aliado o víctima)
+                    this.enviarMensaje("ROL," + otro.id + "," + otro.esImpostor);
+                    
+                    if (!otro.estaVivo) {
+                        this.enviarMensaje("MUERTE," + otro.id);
+                    }
+                    
+                    // --- AVISAMOS A LOS OTROS QUE LLEGUÉ YO ---
                     otro.enviarMensaje("MOV," + this.id + "," + this.x + "," + this.y);
+                    // Avisamos mi rol a los demás
+                    otro.enviarMensaje("ROL," + this.id + "," + this.esImpostor);
                 }
             }
 
@@ -55,20 +70,52 @@ public class HiloCliente extends Thread {
             while (true) {
                 String mensaje = entrada.readUTF();
                 
-                // SI ES MOVIMIENTO, ACTUALIZAMOS LAS COORDENADAS EN EL SERVIDOR
-                if (mensaje.startsWith("MOV")) {
+                // NUEVO: Si llega un cambio de color
+                if (mensaje.startsWith("COLOR")) {
                     String[] partes = mensaje.split(",");
-                    // Guardamos la última posición conocida en el servidor
+                    // Guardamos el color en el servidor
+                    this.r = Integer.parseInt(partes[2]);
+                    this.g = Integer.parseInt(partes[3]);
+                    this.b = Integer.parseInt(partes[4]);
+                }
+                
+                // Si es movimiento (guardamos posición)
+                else if (mensaje.startsWith("MOV")) {
+                    String[] partes = mensaje.split(",");
                     this.x = Double.parseDouble(partes[2]);
                     this.y = Double.parseDouble(partes[3]);
                 }
+                // COMANDO MATAR: El Impostor dice "Maté a X"
+                else if (mensaje.startsWith("MATAR")) {
+                    String[] partes = mensaje.split(",");
+                    int idVictima = Integer.parseInt(partes[1]);
+                    System.out.println("SERVIDOR: MATARON A " + idVictima);
+                    
+                    // A) Buscamos a la víctima en la lista del servidor y la marcamos como muerta
+                    for (HiloCliente cliente : listaTodos) {
+                        if (cliente.id == idVictima) {
+                            cliente.estaVivo = false; // <--- ¡AQUÍ GUARDAMOS EL DATO!
+                        }
+                        // B) Avisamos a todos (Broadcast)
+                        cliente.enviarMensaje("MUERTE," + idVictima);
+                    }
+                }
+                // COMANDO REPORT: Alguien encontró un cuerpo
+                else if (mensaje.startsWith("REPORT")) {
+                    // Mensaje entrante: "REPORT,ID_MUERTO"
+                    System.out.println("SERVIDOR: ¡REUNIÓN DE EMERGENCIA LLAMADA POR " + this.id + "!");
+                    
+                    // Avisamos a TODOS que hay reunión
+                    // El protocolo será: "REUNION,ID_DEL_QUE_REPORTO"
+                    for (HiloCliente cliente : listaTodos) {
+                        cliente.enviarMensaje("REUNION," + this.id);
+                    }
+                }
 
-                // Reenviar a todos (Broadcast)
+                // REENVIAR A TODOS (Broadcast)
                 for (HiloCliente cliente : listaTodos) {
                     cliente.enviarMensaje(mensaje);
-                    
                 }
-                
             }
         } catch (Exception e) {
             System.out.println("Jugador " + id + " desconectado.");

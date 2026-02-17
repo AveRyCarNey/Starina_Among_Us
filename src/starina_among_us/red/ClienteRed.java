@@ -78,6 +78,34 @@ public class ClienteRed extends Thread {
                     int idQueSeFue = Integer.parseInt(partes[1]);
                     panel.eliminarJugador(idQueSeFue);
                 }
+                else if (comando.equals("COLOR")) {
+                    // Protocolo: COLOR, ID, R, G, B
+                    int idJugador = Integer.parseInt(partes[1]);
+                    int r = Integer.parseInt(partes[2]);
+                    int g = Integer.parseInt(partes[3]);
+                    int b = Integer.parseInt(partes[4]);
+                    
+                    // Avisamos al panel para que pinte al muñeco
+                    panel.actualizarColorJugador(idJugador, r, g, b);
+                }
+                else if (comando.equals("MUERTE")) {
+                    System.out.println("CLIENTE: ALGUIEN HA MUERTO, ACTUALIZANDO...");
+                    int idMuerto = Integer.parseInt(partes[1]);
+                    // Avisamos al panel
+                    panel.reportarMuerte(idMuerto);
+                }
+                else if (comando.equals("ROL")) {
+                    // Protocolo: ROL, ID, ES_IMPOSTOR (true/false)
+                    int id = Integer.parseInt(partes[1]);
+                    boolean esImpostor = Boolean.parseBoolean(partes[2]);
+                    
+                    panel.actualizarRolJugador(id, esImpostor);
+                }
+                else if (comando.equals("REUNION")) {
+                    int idReportador = Integer.parseInt(partes[1]);
+                    panel.iniciarReunion(idReportador);
+                }
+                
             }
         } catch (Exception e) {
             System.out.println("Desconectado");
