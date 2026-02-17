@@ -244,7 +244,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 imgReporteFondo = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 1, 940, 435);
                 
                 // 3. RECORTAR TEXTO (Dead Body) -> 1, 437 | 421 x 369
-                imgReporteTexto = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 437, 420, 290);
+                imgReporteTexto = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 437, 420, 205);
                 
                 System.out.println("✂️ Recortes realizados con éxito.");
             }
