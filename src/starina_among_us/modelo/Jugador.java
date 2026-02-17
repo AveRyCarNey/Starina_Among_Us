@@ -2,8 +2,10 @@ package starina_among_us.modelo;
 
 import java.awt.Color;
 import java.awt.Graphics;
+import java.awt.AlphaComposite;
+import java.awt.Graphics2D;
+import java.awt.Composite;
 import java.awt.Image;
-import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
@@ -19,9 +21,11 @@ public class Jugador {
     private boolean esImpostor;
     private Color colorPersonaje;
     
+    
     // ESTADOS
     private boolean moviendose = false; 
     private boolean mirandoDerecha = true; // NUEVO: Para saber a dónde mira
+    private boolean cuerpoReportado = false;
     
     // IMÁGENES
     private BufferedImage imgQuietoOriginal, imgMuertoOriginal;
@@ -37,6 +41,7 @@ public class Jugador {
     
     private final int ANCHO = 50; 
     private final int ALTO = 60;
+    private int retardoAnimacion = 0;
 
     public Jugador(int id, String nombre, double x, double y, boolean esImpostor) {
         this.id = id;
@@ -107,28 +112,23 @@ public class Jugador {
         }
     }
 
-    public void mover(double dx, double dy) {
-        if (estaVivo) {
-            double nuevaX = this.x + (dx * velocidad);
-            double nuevaY = this.y + (dy * velocidad);
+    // Método exclusivo para manejar los frames de la animación
+    public void actualizarAnimacion() {
+        if (moviendose) {
+            // SOLO LÓGICA DE FRAMES (Sin tocar X ni Y)
+            retardoAnimacion++;
             
-            // LÍMITES (Suponiendo ventana de 800x600 aprox)
-            // Math.max(0, ...) impide que baje de 0
-            // Math.min(740, ...) impide que pase de 740
-            this.x = Math.max(0, Math.min(740, nuevaX));
-            this.y = Math.max(0, Math.min(500, nuevaY));
-            
-            // LÓGICA DE VOLTEAR
-            if (dx > 0) {
-                mirandoDerecha = true;
-                moviendose = true;
-            } else if (dx < 0) {
-                mirandoDerecha = false;
-                moviendose = true;
-            } else if (dy != 0) {
-                // Si solo se mueve verticalmente, sigue moviéndose pero mantiene el lado
-                moviendose = true;
+            if (retardoAnimacion > 3) { // Velocidad de la animación
+                frameActual++; 
+                
+                if (frameActual >= animacionWalkPintada.length) {
+                    frameActual = 0;
+                }
+                retardoAnimacion = 0; 
             }
+        } else {
+            // Si está quieto, reseteamos al frame 0
+            frameActual = 0;
         }
     }
     
@@ -137,50 +137,61 @@ public class Jugador {
     }
     
     public void dibujar(Graphics g, JPanel panelObservador) {
-        
-        Image imagenActual;
-        
-        if (!estaVivo) {
+
+    Image imagenActual;
+    boolean esFantasma = false; // Bandera para saber si aplicamos transparencia
+
+    // --- 1. SELECCIÓN DE IMAGEN ---
+    if (!estaVivo) {
+        if (cuerpoReportado) {
+            // FANTASMA: Muerto y reportado.
+            // Usamos la imagen normal (de pie) pero será transparente
+            imagenActual = imgMuertoPintada; 
+            esFantasma = true; 
+        } else {
+            // CADÁVER RECIENTE: Huesito en el suelo (Opaco)
             imagenActual = imgMuertoPintada;
-        } else if (moviendose) {
-            // --- LÓGICA DE ANIMACIÓN ---
-            long tiempoActual = System.currentTimeMillis();
-            
-            // Si pasaron 100ms, avanzamos al siguiente frame
-            if (tiempoActual - tiempoUltimoFrame > VELOCIDAD_ANIMACION) {
-                frameActual++;
-                if (frameActual >= animacionWalkPintada.length) {
-                    frameActual = 0; // Volver al principio (Loop)
-                }
-                tiempoUltimoFrame = tiempoActual;
-            }
-            
-            // Elegimos la foto que toca ahora
+        }
+    } 
+    else if (moviendose) {
+        if (frameActual < animacionWalkPintada.length) {
             imagenActual = animacionWalkPintada[frameActual];
         } else {
-            frameActual = 0;
             imagenActual = imgQuietoPintada;
         }
-        
-        if (imagenActual != null) {
-            // TRUCO DEL ESPEJO:
-            if (mirandoDerecha) {
-                
-                g.drawImage(imagenActual, (int)x, (int)y, ANCHO, ALTO, panelObservador);
-            } else {
-               
-                g.drawImage(imagenActual, (int)x + ANCHO, (int)y, -ANCHO, ALTO, panelObservador);
-            }
-            
-            g.setColor(Color.WHITE);
-            
-            g.drawString(nombre, (int)x + 10, (int)y - 5);
-        } else {
-            g.setColor(Color.MAGENTA);
-            
-            g.fillRect((int)x, (int)y, ANCHO, ALTO);
-        }
+    } 
+    else {
+        imagenActual = imgQuietoPintada;
     }
+
+    // --- 2. DIBUJADO EN PANTALLA ---
+    if (imagenActual != null) {
+
+        Graphics2D g2 = (Graphics2D) g;
+        Composite originalComposite = g2.getComposite(); // Guardar configuración original
+
+        // SI ES FANTASMA -> 50% TRANSPARENCIA
+        if (esFantasma) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+        }
+
+        // Dibujar (Normal o Espejo)
+        if (mirandoDerecha) {
+            g2.drawImage(imagenActual, (int)x, (int)y, ANCHO, ALTO, panelObservador);
+        } else {
+            g2.drawImage(imagenActual, (int)x + ANCHO, (int)y, -ANCHO, ALTO, panelObservador);
+        }
+
+        // RESTAURAR OPACIDAD (Para que el nombre se lea bien)
+        if (esFantasma) {
+            g2.setComposite(originalComposite);
+        }
+
+        // Dibujar Nombre
+        g.setColor(Color.WHITE);
+        g.drawString(nombre, (int)x + 10, (int)y - 5);
+    }
+}
 
     public double getX() { return x; }
     public double getY() { return y; }
@@ -196,6 +207,54 @@ public class Jugador {
     public void setImpostor(boolean esImpostor) {
         this.esImpostor = esImpostor;
     }
+    public void setCuerpoReportado(boolean reportado) {
+        this.cuerpoReportado = reportado;
+    }
+    public String getNombre(){return this.nombre;}
+    public boolean isCuerpoReportado() {
+    return cuerpoReportado;
+}
+    public boolean isMoviendose() {
+        return moviendose;
+    }
+
+    public void setMoviendose(boolean moviendose) {
+        this.moviendose = moviendose;
+    }
+
+    public boolean isMirandoDerecha() {
+        return mirandoDerecha;
+    }
+
+    public void setMirandoDerecha(boolean mirandoDerecha) {
+        this.mirandoDerecha = mirandoDerecha;
+    }
+    
+    // Cambiamos el nombre para que no choque con setters automáticos y sea más claro
+public void setColorManual(int colorID) {
+    Color realColor;
+    // Lista de colores según el ID
+    switch(colorID) {
+        case 1: realColor = Color.BLUE; break;
+        case 2: realColor = Color.GREEN; break;
+        case 3: realColor = Color.YELLOW; break;
+        case 4: realColor = Color.PINK; break;
+        case 5: realColor = Color.CYAN; break;
+        default: realColor = new Color(197, 17, 17); break; // Rojo original
+    }
+    
+    this.colorPersonaje = realColor;
+    // Llamamos a cambiarSkin para regenerar las imágenes con el nuevo color
+    this.cambiarSkin(realColor); 
+}
+
+public void setColorRGB(int r, int g, int b) {
+    // Guardamos el objeto Color real
+    this.colorPersonaje = new Color(r, g, b);
+    
+    // Ejecutamos la lógica de pintado de frames
+    this.cambiarSkin(this.colorPersonaje);
+}
 
     
 }

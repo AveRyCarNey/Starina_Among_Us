@@ -4,30 +4,34 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class HiloCliente extends Thread {
 
     private Socket socket;
     private DataInputStream entrada;
     private DataOutputStream salida;
-    private ArrayList<HiloCliente> listaTodos;
+    private CopyOnWriteArrayList<HiloCliente> listaTodos;
     
     private int id;
     private boolean esImpostor;
     
-    // El servidor necesita recordar dónde está este jugador
-    private double x, y;
+    // --- MEMORIA DEL ESTADO DEL JUGADOR (Públicas para acceso rápido) ---
+    public int x = 50; 
+    public int y = 50;
+    public int r = 197, g = 17, b = 17; // Color inicial (Rojo)
+    public String nombre = "Tripulante";
+    public boolean mirandoDerecha = true;
+    public boolean moviendose = false;
+    public boolean estaVivo = true;
     
-    private boolean estaVivo = true;
-    
-    private int r = 255, g = 0, b = 0;
-
-    public HiloCliente(Socket socket, ArrayList<HiloCliente> lista, int id, boolean impostor) {
+    public HiloCliente(Socket socket, CopyOnWriteArrayList<HiloCliente> lista, int id, boolean impostor) {
         this.socket = socket;
         this.listaTodos = lista;
         this.id = id;
         this.esImpostor = impostor;
-        // Posición inicial por defecto
+        
+        // Posición inicial por defecto (para que no aparezcan todos encimados al principio)
         this.x = 100 + (id * 30);
         this.y = 200;
         
@@ -40,97 +44,120 @@ public class HiloCliente extends Thread {
     @Override
     public void run() {
         try {
-            // 1. BIENVENIDA: Le decimos al nuevo quién es
+            // ==========================================
+            // 1. FASE INICIAL: Sincronizar al NUEVO con lo que ya existe
+            // ==========================================
+            
+            // A) Saludo inicial (Tu ID, tu posición, etc.)
             this.enviarMensaje("BIENVENIDO," + id + "," + esImpostor + "," + x + "," + y);
 
-            // --- ACTUALIZACIÓN DE ESTADO ---
-            // Le contamos al nuevo dónde están los jugadores VIEJOS
-            for (HiloCliente otro : listaTodos) {
-                if (otro.id != this.id) {
-                    // Le decimos dónde está
-                    this.enviarMensaje("MOV," + otro.id + "," + otro.x + "," + otro.y);
-                    // Le decimos su color
-                    this.enviarMensaje("COLOR," + otro.id + "," + otro.r + "," + otro.g + "," + otro.b);
-                    
-                    // NUEVO: Le decimos SU ROL (Para que sepa si es aliado o víctima)
-                    this.enviarMensaje("ROL," + otro.id + "," + otro.esImpostor);
-                    
-                    if (!otro.estaVivo) {
-                        this.enviarMensaje("MUERTE," + otro.id);
-                    }
-                    
-                    // --- AVISAMOS A LOS OTROS QUE LLEGUÉ YO ---
-                    otro.enviarMensaje("MOV," + this.id + "," + this.x + "," + this.y);
-                    // Avisamos mi rol a los demás
-                    otro.enviarMensaje("ROL," + this.id + "," + this.esImpostor);
-                }
-            }
+            // B) Le contamos al NUEVO sobre los jugadores VIEJOS
+for (HiloCliente otro : listaTodos) {
+    if (otro.id != this.id) {
+        // Enviamos R, G, B por separado en el protocolo SINCRO
+        String msjSincro = "SINCRO," + otro.id + "," + 
+                           otro.x + "," + otro.y + "," + 
+                           otro.r + "," + otro.g + "," + otro.b + "," + 
+                           otro.nombre + "," + 
+                           otro.mirandoDerecha;
+        
+        this.enviarMensaje(msjSincro);
+        
+        if (!otro.estaVivo) {
+            this.enviarMensaje("MUERTE," + otro.id);
+        }
+    }
+}
 
-            // 2. BUCLE: Escuchar mensajes
+            // ==========================================
+            // 2. BUCLE DEL JUEGO (Escuchar mensajes)
+            // ==========================================
             while (true) {
                 String mensaje = entrada.readUTF();
+                String[] partes = mensaje.split(",");
+                String comando = partes[0];
                 
-                // NUEVO: Si llega un cambio de color
-                if (mensaje.startsWith("COLOR")) {
-                    String[] partes = mensaje.split(",");
-                    // Guardamos el color en el servidor
-                    this.r = Integer.parseInt(partes[2]);
-                    this.g = Integer.parseInt(partes[3]);
-                    this.b = Integer.parseInt(partes[4]);
-                }
+                // --- COMANDO HOLA (Cuando el cliente se presenta) ---
+                // Comando HOLA: HOLA, Nombre, R, G, B
+if (comando.equals("HOLA")) {
+    this.nombre = partes[1];
+    if (partes.length > 4) {
+        this.r = Integer.parseInt(partes[2]);
+        this.g = Integer.parseInt(partes[3]);
+        this.b = Integer.parseInt(partes[4]);
+    }
+    // Presentamos al nuevo enviando SINCRO con sus 3 colores
+    for (HiloCliente otro : listaTodos) {
+        if (otro.id != this.id) {
+            String presentacion = "SINCRO," + this.id + "," + this.x + "," + this.y + "," + 
+                                  this.r + "," + this.g + "," + this.b + "," + 
+                                  this.nombre + "," + this.mirandoDerecha;
+            otro.enviarMensaje(presentacion);
+        }
+    }
+}
                 
-                // Si es movimiento (guardamos posición)
-                else if (mensaje.startsWith("MOV")) {
-                    String[] partes = mensaje.split(",");
-                    this.x = Double.parseDouble(partes[2]);
-                    this.y = Double.parseDouble(partes[3]);
-                }
-                // COMANDO MATAR: El Impostor dice "Maté a X"
-                else if (mensaje.startsWith("MATAR")) {
-                    String[] partes = mensaje.split(",");
-                    int idVictima = Integer.parseInt(partes[1]);
-                    System.out.println("SERVIDOR: MATARON A " + idVictima);
-                    
-                    // A) Buscamos a la víctima en la lista del servidor y la marcamos como muerta
-                    for (HiloCliente cliente : listaTodos) {
-                        if (cliente.id == idVictima) {
-                            cliente.estaVivo = false; // <--- ¡AQUÍ GUARDAMOS EL DATO!
-                        }
-                        // B) Avisamos a todos (Broadcast)
-                        cliente.enviarMensaje("MUERTE," + idVictima);
-                    }
-                }
-                // COMANDO REPORT: Alguien encontró un cuerpo
-                else if (mensaje.startsWith("REPORT")) {
-                    // Mensaje entrante: "REPORT,ID_MUERTO"
-                    System.out.println("SERVIDOR: ¡REUNIÓN DE EMERGENCIA LLAMADA POR " + this.id + "!");
-                    
-                    // Avisamos a TODOS que hay reunión
-                    // El protocolo será: "REUNION,ID_DEL_QUE_REPORTO"
-                    for (HiloCliente cliente : listaTodos) {
-                        cliente.enviarMensaje("REUNION," + this.id);
-                    }
-                }
+                // --- COMANDO MOVIMIENTO ---
+                else if (comando.equals("MOV")) {
+    this.x = Integer.parseInt(partes[2]);
+    this.y = Integer.parseInt(partes[3]);
+    // Verificación de seguridad para mensajes cortos
+    if (partes.length > 5) {
+        this.mirandoDerecha = Boolean.parseBoolean(partes[4]);
+        this.moviendose = Boolean.parseBoolean(partes[5]);
+    }
+    broadcast(mensaje, this);
+}
 
-                // REENVIAR A TODOS (Broadcast)
-                for (HiloCliente cliente : listaTodos) {
-                    cliente.enviarMensaje(mensaje);
+                // --- OTROS COMANDOS ---
+                else if (comando.equals("COLOR")) {
+    this.r = Integer.parseInt(partes[2]);
+    this.g = Integer.parseInt(partes[3]);
+    this.b = Integer.parseInt(partes[4]);
+    broadcast(mensaje, this);
+}
+                
+                else if (comando.equals("MATAR")) {
+                    int idVictima = Integer.parseInt(partes[1]);
+                    for (HiloCliente c : listaTodos) {
+                        if (c.id == idVictima) c.estaVivo = false;
+                    }
+                    broadcast("MUERTE," + idVictima, null);
+                }
+                
+                else if (comando.equals("REPORT")) {
+                    broadcast("REUNION," + this.id, null);
+                }
+                
+                // Reenvío general para cualquier otro mensaje
+                else {
+                    broadcast(mensaje, this);
                 }
             }
+            
         } catch (Exception e) {
             System.out.println("Jugador " + id + " desconectado.");
-            
-            // 1. Lo borramos de la lista del servidor
             listaTodos.remove(this);
-            
-            // 2. Avisamos a los sobrevivientes para que borren el dibujo
-            for (HiloCliente cliente : listaTodos) {
-                cliente.enviarMensaje("SALIO," + this.id);
-            }
+            broadcast("SALIO," + this.id, this);
         }
     }
 
+    // Método auxiliar para enviar mensaje a este cliente
     public void enviarMensaje(String msg) {
-        try { if (salida != null) salida.writeUTF(msg); } catch (Exception e) {}
+        try { 
+            if (salida != null) {
+                salida.writeUTF(msg);
+                salida.flush();
+            } 
+        } catch (Exception e) {}
+    }
+    
+    // Método auxiliar para enviar a TODOS (menos al remitente opcional)
+    private void broadcast(String msg, HiloCliente remitente) {
+        for (HiloCliente c : listaTodos) {
+            if (c != remitente) {
+                c.enviarMensaje(msg);
+            }
+        }
     }
 }

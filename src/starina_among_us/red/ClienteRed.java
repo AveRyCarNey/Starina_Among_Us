@@ -3,6 +3,7 @@ package starina_among_us.red;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
+import starina_among_us.modelo.Jugador;
 import starina_among_us.vista.PanelJuego;
 
 public class ClienteRed extends Thread {
@@ -51,21 +52,40 @@ public class ClienteRed extends Thread {
                 String comando = partes[0];
 
                 if (comando.equals("BIENVENIDO")) {
-                    // El servidor me asignó mis datos: "BIENVENIDO,id,impostor,x,y"
                     int miId = Integer.parseInt(partes[1]);
                     boolean soyImpostor = Boolean.parseBoolean(partes[2]);
                     double x = Double.parseDouble(partes[3]);
                     double y = Double.parseDouble(partes[4]);
-                    
-                    // Le decimos al Panel: "¡Ya sé quién soy! Créame ahora."
                     panel.inicializarJugadorLocal(miId, soyImpostor, x, y);
+                    enviar("HOLA,Jugador " + miId + ",197,17,17"); 
                 }
-                else if (comando.equals("MOV")) {
-                    // ... (El código de movimiento que ya tenías) ...
-                    int id = Integer.parseInt(partes[1]);
-                    double x = Double.parseDouble(partes[2]);
-                    double y = Double.parseDouble(partes[3]);
-                    panel.actualizarJugadorRemoto(id, x, y);
+               else if (comando.equals("MOV")) {
+                    try {
+                        // 1. Parsear los datos básicos
+                        int id = Integer.parseInt(partes[1]);
+                        int x = Integer.parseInt(partes[2]);
+                        int y = Integer.parseInt(partes[3]);
+                        Jugador j = panel.getJugador(id);
+                        
+                        // 2. Parsear los datos de ANIMACIÓN (¡Nuevos!)
+                        // Usamos Boolean.parseBoolean para convertir el texto "true"/"false"
+                        boolean mirandoDerecha = Boolean.parseBoolean(partes[4]);
+                        boolean moviendose = Boolean.parseBoolean(partes[5]); 
+
+                        
+
+                        if (j != null) {
+                        j.setX(Integer.parseInt(partes[2]));
+                        j.setY(Integer.parseInt(partes[3]));
+                        // Solo leemos si el mensaje está completo
+                        if (partes.length > 5) {
+                            j.setMirandoDerecha(Boolean.parseBoolean(partes[4]));
+                            j.setMoviendose(Boolean.parseBoolean(partes[5]));
+                        }
+                    }
+                    } catch (Exception e) {
+                        System.out.println("⚠️ Error al procesar movimiento: " + mensaje);
+                    }
                 }
                 else if (comando.equals("MATAR")) {
                     // Mensaje: "MATAR,ID_VICTIMA"
@@ -104,6 +124,22 @@ public class ClienteRed extends Thread {
                 else if (comando.equals("REUNION")) {
                     int idReportador = Integer.parseInt(partes[1]);
                     panel.iniciarReunion(idReportador);
+                }
+                else if (comando.equals("SINCRO")) {
+                    int id = Integer.parseInt(partes[1]);
+                    int x = Integer.parseInt(partes[2]);
+                    int y = Integer.parseInt(partes[3]);
+                    int r = Integer.parseInt(partes[4]);
+                    int g = Integer.parseInt(partes[5]);
+                    int b = Integer.parseInt(partes[6]);
+                    String nombre = partes[7];
+                    
+                    Jugador j = panel.getJugador(id);
+                    if (j == null) {
+                        panel.agregarJugador(id, nombre, x, y, r, g, b);
+                        j = panel.getJugador(id);
+                    }
+                    if (j != null) j.setColorRGB(r, g, b);
                 }
                 
             }

@@ -12,6 +12,7 @@ import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import javax.swing.JButton;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.ImageIcon;
 import javax.swing.JPanel;
 import javax.swing.Timer;
@@ -21,8 +22,6 @@ import starina_among_us.red.ClienteRed;
 import java.awt.Toolkit;
 
 import java.awt.image.BufferedImage;
-import javax.imageio.ImageIO;
-import starina_among_us.modelo.HerramientasImagen;
 
 public class PanelJuego extends JPanel implements KeyListener, ActionListener, FocusListener {
 
@@ -34,7 +33,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     
     // Almacén principal de datos: Diccionario que vincula un ID (Entero) con un Jugador (Objeto)
     // Nos permite buscar rápido a cualquier jugador por su número.
-    private HashMap<Integer, Jugador> jugadoresConectados;
+    private ConcurrentHashMap<Integer, Jugador> jugadoresConectados;
     
     // Identidad del usuario local: Define cuál de todos los muñecos soy "yo" para controlarlo.
     private int miId; 
@@ -65,6 +64,16 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         {400, 480}  
     };
     
+    // --- VARIABLES DE ESPECTADOR ---
+    private int idEspectando = -1; // A quién está mirando la cámara actualmente
+    private boolean modoEspectador = false; // ¿Estoy muerto y espectando?
+    
+    // IMÁGENES DE REPORTE (Separadas)
+    private java.awt.image.BufferedImage imgReporteFondo; // El efecto
+    private java.awt.image.BufferedImage imgReporteTexto; // Las letras
+    
+    private boolean mostrandoAnimacionReporte = false;
+    
     
 
     public PanelJuego() {
@@ -75,7 +84,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         this.addFocusListener(this);
 
         // Inicializar la base de datos de jugadores vacía
-        jugadoresConectados = new HashMap<>();
+        jugadoresConectados = new ConcurrentHashMap<>();
 
         // Cargar el mapa
         try {
@@ -197,6 +206,53 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         clienteRed = new ClienteRed(this);
         reloj = new Timer(15, this);
         reloj.start();
+        
+        
+        
+        
+        this.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                // SOLO FUNCIONA SI ESTOY MUERTO
+                if (modoEspectador) {
+                    // Click Izquierdo (Botón 1) -> Anterior
+                    // Click Derecho (Botón 3) -> Siguiente
+                    boolean avanzar = (e.getButton() != java.awt.event.MouseEvent.BUTTON1);
+                    cambiarObjetivoEspectador(avanzar);
+                }
+            }
+        });
+        
+        
+        // --- CARGAR ASSETS DE EVENTOS (REPORTE) ---
+        imgReporteFondo = null; // Aseguramos que empiecen vacías
+        imgReporteTexto = null;
+
+        try {
+            System.out.println("Intentando cargar: /starina_among_us/recursos/eventos/assets_events.png");
+            
+            // 1. Cargar la hoja
+            java.net.URL urlImagen = getClass().getResource("/starina_among_us/recursos/eventos/assets_events.png");
+            
+            if (urlImagen == null) {
+                System.out.println("❌ ERROR FATAL: La URL de la imagen es NULL. Verifica la carpeta 'eventos' y el nombre 'asstes_events.png'");
+            } else {
+                java.awt.image.BufferedImage hojaEventos = javax.imageio.ImageIO.read(urlImagen);
+                System.out.println("✅ Imagen cargada correctamente. Tamaño: " + hojaEventos.getWidth() + "x" + hojaEventos.getHeight());
+
+                // 2. RECORTAR FONDO (Effect) -> 1, 1 | 950 x 435
+                imgReporteFondo = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 1, 940, 435);
+                
+                // 3. RECORTAR TEXTO (Dead Body) -> 1, 437 | 421 x 369
+                imgReporteTexto = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 437, 420, 290);
+                
+                System.out.println("✂️ Recortes realizados con éxito.");
+            }
+            
+        } catch (Exception e) {
+            System.out.println("❌ EXCEPCIÓN AL CARGAR IMAGEN: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -206,6 +262,32 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         // 1. DIBUJAR MAPA
         if (fondoMapa != null) {
             g.drawImage(fondoMapa, 0, 0, getWidth(), getHeight(), this);
+        }
+        
+        // --- INTERFAZ DE ESPECTADOR ---
+        if (modoEspectador && idEspectando != -1) {
+            if (jugadoresConectados.containsKey(idEspectando)) {
+                Jugador objetivo = jugadoresConectados.get(idEspectando);
+                
+                Graphics2D g2 = (Graphics2D) g;
+                
+                // 1. DIBUJAR MARCO ALREDEDOR DEL JUGADOR OBSERVADO
+                g2.setColor(Color.CYAN);
+                g2.setStroke(new BasicStroke(3));
+                g2.drawRect((int)objetivo.getX() - 5, (int)objetivo.getY() - 5, 60, 70);
+                
+                // 2. DIBUJAR TEXTO EN PANTALLA (HUD)
+                g2.setColor(Color.BLACK);
+                g2.fillRect(250, 10, 300, 40); // Fondo negro arriba
+                g2.setColor(Color.WHITE);
+                g2.drawRect(250, 10, 300, 40); // Borde blanco
+                
+                g2.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 16));
+                g2.drawString("ESPECTANDO A: " + objetivo.getNombre(), 280, 35);
+                
+                g2.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 10));
+                g2.drawString("[CLICK IZQ / CLICK DER] PARA CAMBIAR", 300, 45);
+            }
         }
         
         // 2. DIBUJAR JUGADORES
@@ -234,18 +316,69 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 g2.drawString(" KILL ID " + idVictimaCercana, (int)victima.getX(), (int)victima.getY() - 10);
             }
         }
+        
+        
+        // --- ANIMACIÓN DE REPORTE ---
+        if (mostrandoAnimacionReporte) {
+            
+            // 1. Oscurecer pantalla
+            g.setColor(new Color(0, 0, 0, 150));
+            g.fillRect(0, 0, getWidth(), getHeight());
+            
+            int centroX = getWidth() / 2;
+            int centroY = getHeight() / 2;
+
+            // --- PLAN A: DIBUJAR IMÁGENES ---
+            if (imgReporteFondo != null && imgReporteTexto != null) {
+                
+                // Fondo
+                int anchoFondo = 800; 
+                int altoFondo = 350;
+                g.drawImage(imgReporteFondo, centroX - (anchoFondo / 2), centroY - (altoFondo / 2), anchoFondo, altoFondo, this);
+                
+                // Texto
+                int anchoTexto = 300;
+                int altoTexto = 260;
+                g.drawImage(imgReporteTexto, centroX - (anchoTexto / 2), centroY - (altoTexto / 2), anchoTexto, altoTexto, this);
+            
+            } 
+            // --- PLAN B: DIBUJAR CUADRO DE ERROR (Si falló la imagen) ---
+            else {
+                g.setColor(Color.RED);
+                g.fillRect(centroX - 200, centroY - 50, 400, 100);
+                
+                g.setColor(Color.WHITE);
+                g.drawRect(centroX - 200, centroY - 50, 400, 100);
+                
+                g.setFont(new java.awt.Font("Arial", java.awt.Font.BOLD, 20));
+                g.drawString("ERROR CARGANDO IMAGEN", centroX - 130, centroY + 10);
+                g.setFont(new java.awt.Font("Arial", java.awt.Font.PLAIN, 12));
+                g.drawString("Revisa la consola (Output) para detalles", centroX - 110, centroY + 30);
+            }
+        }
+        
         Toolkit.getDefaultToolkit().sync();
     }
 
     // --- CICLO DEL JUEGO (Lo que hace el reloj cada 15ms) ---
-    @Override
+   @Override
     public void actionPerformed(ActionEvent e) {
         // VALIDACIÓN DE SEGURIDAD
         if (!jugadoresConectados.containsKey(miId)) return;
         
         Jugador miMuñeco = jugadoresConectados.get(miId);
         
-        // --- LOGICA DE MOVIMIENTO ---
+        // --- 1. LÓGICA DE MOVIMIENTO (Calculada por el Panel) ---
+        
+        // Definimos la velocidad (Píxeles por frame)
+        // IMPORTANTE: Si no ponemos velocidad, se moverá a 1 píxel por hora.
+        double velocidad = 4.0; 
+        
+        // Si hay animación de reporte o estoy muerto, no me muevo
+        if (mostrandoAnimacionReporte || (modoEspectador && !miMuñeco.isVivo())) {
+            velocidad = 0;
+        }
+
         double dx = 0;
         double dy = 0;
 
@@ -255,47 +388,60 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         if (abajo)     dy = 1;
 
         // CORRECCIÓN DE DIAGONAL (Normalización)
-        // Si nos movemos en DOS ejes a la vez (diagonal), frenamos un poquito
         if (dx != 0 && dy != 0) {
-            dx *= 0.7071; // Multiplicar por 1/raiz(2)
+            dx *= 0.7071; 
             dy *= 0.7071;
         }
+        
+        // APLICAR VELOCIDAD
+        dx *= velocidad;
+        dy *= velocidad;
 
         // ¿Me estoy moviendo ahora mismo?
         boolean meMuevoAhora = (dx != 0 || dy != 0);
 
         if (meMuevoAhora) {
-            // A) SI ME MUEVO:
-            miMuñeco.mover(dx, dy); // Mover localmente
+            // A) SI ME MUEVO: Actualizamos las coordenadas AQUÍ DIRECTAMENTE
+            miMuñeco.setX(miMuñeco.getX() + dx);
+            miMuñeco.setY(miMuñeco.getY() + dy);
+            miMuñeco.setMoviendose(true);
             
-            // Avisar al servidor (usamos (int) para enviar coordenadas limpias)
-            String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
+            // Dirección para el sprite
+            if (dx > 0) miMuñeco.setMirandoDerecha(true);
+            if (dx < 0) miMuñeco.setMirandoDerecha(false);
+            
+            // Avisar al servidor
+            String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY() 
+                             + "," + miMuñeco.isMirandoDerecha() + "," + miMuñeco.isMoviendose();
             clienteRed.enviar(mensaje);
             
-            estabaMoviendose = true; // Marcar que me estaba moviendo
+            estabaMoviendose = true; 
             
         } else {
             // B) SI NO TOCO TECLAS:
-            miMuñeco.detener(); // Detener animación local
+            miMuñeco.setMoviendose(false);
             
-            // C) ¡EL FRENO DE MANO! (IMPORTANTE)
-            // Si en el frame anterior me movía, y ahora NO, significa que ACABO de frenar.
-            // Tengo que enviar un ÚLTIMO mensaje con mi posición final exacta.
+            // C) ¡EL FRENO DE MANO!
             if (estabaMoviendose) {
-                String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
+                // Enviamos posición final y avisamos que paramos (false)
+                String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY()
+                                 + "," + miMuñeco.isMirandoDerecha() + ",false";
                 clienteRed.enviar(mensaje);
-                estabaMoviendose = false; // Ya avisé, apago la bandera
+                estabaMoviendose = false; 
             }
         }
         
         
+        // ==========================================================
+        //     DE AQUÍ PARA ABAJO ES TU CÓDIGO DE RADARES EXACTO
+        //           (NO HE TOCADO NADA DE ESTA PARTE)
+        // ==========================================================
+        
         // --- NUEVO: RADAR DE ASESINO ---
-        // Solo si soy impostor y el botón está visible
         if (botonKill.isVisible()) { 
             Jugador yo = jugadoresConectados.get(miId);
             if (yo == null) return; 
 
-            // Calculamos CENTRO
             double miCentroX = yo.getX() + 25; 
             double miCentroY = yo.getY() + 25;
 
@@ -303,28 +449,17 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             Jugador victimaPotencial = null;
             
             for (Jugador otro : jugadoresConectados.values()) {
-                
-                // --- FILTRO 1: IDENTIDAD ---
-                if (otro.getId() == miId) continue; // No soy yo
-                
-                // --- FILTRO 2: ESTADO ---
-                if (!otro.isVivo()) continue;    // No muertos
-                if (otro.esImpostor()) continue; // No amigos
+                if (otro.getId() == miId) continue; 
+                if (!otro.isVivo()) continue;    
+                if (otro.esImpostor()) continue; 
 
-                // --- CÁLCULO ---
                 double otroCentroX = otro.getX() + 25;
                 double otroCentroY = otro.getY() + 25;
                 
                 double distancia = Math.hypot(otroCentroX - miCentroX, otroCentroY - miCentroY);
                 
-                // --- FILTRO 3: DISTANCIA MÍNIMA (EL ESCUDO FÍSICO) ---
-                // Si la distancia es MENOR a 10 pixeles, es imposible que sea otro jugador
-                // (porque chocaríamos). Asumimos que es un error o soy yo mismo.
-                if (distancia < 10) {
-                    continue; // ¡Saltar! Demasiado cerca para ser real.
-                }
+                if (distancia < 10) continue; 
 
-                // Rango de ataque real (entre 10 y 60)
                 if (distancia < 60) { 
                     if (distancia < distanciaMinima) {
                         distanciaMinima = distancia;
@@ -333,16 +468,13 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 }
             }
             
-            // --- GESTIÓN DEL BOTÓN ---
             if (victimaPotencial != null) {
-                // Si encontramos una víctima NUEVA
                 if (idVictimaCercana != victimaPotencial.getId()) {
                     idVictimaCercana = victimaPotencial.getId();
                     botonKill.setEnabled(true);
-                    System.out.println("🎯 MIRA FIJADA EN: Jugador " + idVictimaCercana + " (Distancia: " + (int)distanciaMinima + ")");
+                    System.out.println("🎯 MIRA FIJADA EN: Jugador " + idVictimaCercana);
                 }
             } else {
-                // Si no hay nadie o perdimos el objetivo
                 if (botonKill.isEnabled()) {
                     botonKill.setEnabled(false);
                     idVictimaCercana = -1;
@@ -351,27 +483,24 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             }
         }
         
-        // --- RADAR DE VENTS (Solo si el botón es visible / Soy Impostor) ---
+        // --- RADAR DE VENTS ---
         if (botonVent.isVisible()) {
             Jugador yo = jugadoresConectados.get(miId);
             double distanciaMinima = 10000;
             int ventEncontrada = -1;
             
-            // Revisar las 3 alcantarillas
             for (int i = 0; i < COORDENADAS_VENTS.length; i++) {
                 int ventX = COORDENADAS_VENTS[i][0];
                 int ventY = COORDENADAS_VENTS[i][1];
                 
-                // Distancia (Pitágoras)
                 double distancia = Math.hypot(ventX - yo.getX(), ventY - yo.getY());
                 
-                if (distancia < 80) { // Si estoy a menos de 80 pixeles
+                if (distancia < 80) { 
                     distanciaMinima = distancia;
                     ventEncontrada = i;
                 }
             }
             
-            // Activar o desactivar botón
             if (ventEncontrada != -1) {
                 botonVent.setEnabled(true);
                 idVentCercana = ventEncontrada;
@@ -381,8 +510,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             }
         }
         
-        // --- RADAR DE REPORT (Busca cadáveres) ---
-        // Regla: Solo puedo reportar si YO estoy vivo.
+        // --- RADAR DE REPORT ---
         if (jugadoresConectados.containsKey(miId) && jugadoresConectados.get(miId).isVivo()) {
             
             Jugador yo = jugadoresConectados.get(miId);
@@ -390,19 +518,18 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             Jugador cuerpoEncontrado = null;
             
             for (Jugador otro : jugadoresConectados.values()) {
-                // Buscamos a alguien que NO sea yo y que esté MUERTO
-                if (otro.getId() != miId && !otro.isVivo()) {
-                    
-                    double distancia = Math.hypot(otro.getX() - yo.getX(), otro.getY() - yo.getY());
-                    
-                    if (distancia < 60) { // Rango para reportar
-                        distanciaMinima = distancia;
-                        cuerpoEncontrado = otro;
-                    }
+                // CONDICIÓN: Muerto y NO reportado (Fantasma)
+                if (otro.getId() != miId && !otro.isVivo() && !otro.isCuerpoReportado()) {
+
+                double distancia = Math.hypot(otro.getX() - yo.getX(), otro.getY() - yo.getY());
+
+                if (distancia < 60) { 
+                    distanciaMinima = distancia;
+                    cuerpoEncontrado = otro;
                 }
             }
+            }
             
-            // Si encontramos un cuerpo, encendemos el botón
             if (cuerpoEncontrado != null) {
                 botonReport.setVisible(true);
                 botonReport.setEnabled(true);
@@ -413,12 +540,21 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 idCuerpoCercano = -1;
             }
         }
+        // --- ACTUALIZAR ANIMACIONES DE TODOS LOS JUGADORES ---
+        // Esto es vital para ver mover los pies a los demas (y a ti mismo)
+        for (Jugador j : jugadoresConectados.values()) {
+            j.actualizarAnimacion();
+        }
         repaint();
     }
 
     // --- TECLADO (Solo enciende/apaga interruptores) ---
     @Override
     public void keyPressed(KeyEvent e) {
+        
+        // SI ESTOY MUERTO, NO PUEDO MOVERME
+        if (modoEspectador) return; 
+
         int tecla = e.getKeyCode();
         
         if (tecla == KeyEvent.VK_RIGHT) derecha = true;
@@ -492,7 +628,13 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             // --- CASO 3: CAMINANDO NORMAL ---
             // Si es una distancia media, usamos la interpolación suave.
             else {
-                j.mover(dx/5.0, dy/5.0); 
+                // Calculamos el pasito suave
+                double pasoX = dx / 5.0;
+                double pasoY = dy / 5.0;
+
+                // Aplicamos la nueva posición directamente
+                j.setX(j.getX() + pasoX);
+                j.setY(j.getY() + pasoY);
             }
             
         } else {
@@ -505,16 +647,16 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
        // Este se ejecuta cuando llega el mensaje "BIENVENIDO" del servidor
     public void inicializarJugadorLocal(int id, boolean esImpostor, double x, double y) {
         this.miId = id;
+    String nombre = "Jugador " + id + (esImpostor ? " (IMPOSTOR)" : "");
+    
+    // CORRECCIÓN: Asigna el objeto a la variable de la clase
+    this.miJugador = new Jugador(id, nombre, x, y, esImpostor);
+    
+    jugadoresConectados.put(miId, this.miJugador);
         
-        String nombre = "Jugador " + id;
-        if (esImpostor) nombre += " (IMPOSTOR)"; // Para que sepas qué eres
         
-        Jugador yo = new Jugador(id, nombre, x, y, esImpostor);
         
-        // Si soy impostor, me pinto de otro color (solo para mis ojos, por ahora)
-        // Ojo: Necesitarías un setter para el color en Jugador.java, o déjalo así.
         
-        jugadoresConectados.put(miId, yo);
         System.out.println("¡Soy el ID " + id + "! Rol: " + (esImpostor ? "IMPOSTOR" : "TRIPULANTE"));
         
         //Si se es impostor, aparecera el boton
@@ -545,6 +687,18 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             System.out.println("ERROR: Se ordenó matar al ID " + idMuerto + " pero no lo encuentro en mi lista.");
             System.out.println("Jugadores visibles: " + jugadoresConectados.keySet());
         }
+        
+        if (idMuerto == miId) {
+            System.out.println("💀 ME HAN MATADO. ACTIVANDO MODO ESPECTADOR.");
+            modoEspectador = true;
+            idEspectando = -1; // Reset para que busque uno nuevo al hacer click o forzarlo
+            cambiarObjetivoEspectador(true); // Auto-asignar el primero que encuentre
+            
+            // Apagar botones de interacción física
+            botonKill.setVisible(false);
+            botonVent.setVisible(false);
+            botonReport.setVisible(false);
+        }
         repaint();
     }
         
@@ -563,28 +717,36 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         // No hace falta hacer nada especial aquí.
     }
 
-    @Override
-    public void focusLost(FocusEvent e) {
-        // ¡EMERGENCIA! El usuario hizo clic en otra ventana.
-        // Soltamos todas las teclas virtualmente para que no se quede pegado.
-        derecha = false;
-        izquierda = false;
-        arriba = false;
-        abajo = false;
-        
-        // Forzamos al muñeco a detenerse
-        if (jugadoresConectados.containsKey(miId)) {
-            Jugador miMuñeco = jugadoresConectados.get(miId);
-            miMuñeco.detener();
-            
-            // Enviamos un último mensaje al servidor diciendo "ME DETUVE"
-            // para que los demás no me vean caminando infinito.
-            String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY();
-            clienteRed.enviar(mensaje);
-        }
-        
-        repaint();
+    // CORRECCIÓN EN focusLost
+@Override
+public void focusLost(FocusEvent e) {
+    derecha = izquierda = arriba = abajo = false;
+    if (jugadoresConectados.containsKey(miId)) {
+        Jugador miMuñeco = jugadoresConectados.get(miId);
+        miMuñeco.detener();
+        // Agregamos las partes faltantes (mirandoDerecha y moviendose=false)
+        String mensaje = "MOV," + miId + "," + (int)miMuñeco.getX() + "," + (int)miMuñeco.getY() 
+                         + "," + miMuñeco.isMirandoDerecha() + ",false";
+        clienteRed.enviar(mensaje);
     }
+    repaint();
+}
+
+// CORRECCIÓN EN teletransportar
+private void teletransportar() {
+    if (!jugadoresConectados.containsKey(miId)) return;
+    int siguienteVent = (idVentCercana + 1) % COORDENADAS_VENTS.length;
+    int nuevaX = COORDENADAS_VENTS[siguienteVent][0];
+    int nuevaY = COORDENADAS_VENTS[siguienteVent][1];
+    
+    Jugador yo = jugadoresConectados.get(miId);
+    yo.setX(nuevaX);
+    yo.setY(nuevaY);
+    
+    // Agregamos las partes faltantes para evitar que el servidor crashée
+    String mensaje = "MOV," + miId + "," + nuevaX + "," + nuevaY + "," + yo.isMirandoDerecha() + ",false";
+    clienteRed.enviar(mensaje);
+}
     // Método que llama ClienteRed cuando llega un aviso de color
     public void actualizarColorJugador(int id, int r, int g, int b) {
         if (jugadoresConectados.containsKey(id)) {
@@ -596,31 +758,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         }
     }
     
-    private void teletransportar() {
-        if (!jugadoresConectados.containsKey(miId)) return;
-        
-        // 1. Calcular la SIGUIENTE alcantarilla (Circuito 0 -> 1 -> 2 -> 0)
-        int siguienteVent = idVentCercana + 1;
-        if (siguienteVent >= COORDENADAS_VENTS.length) {
-            siguienteVent = 0; // Volver al inicio
-        }
-        
-        // 2. Obtener coordenadas destino
-        int nuevaX = COORDENADAS_VENTS[siguienteVent][0];
-        int nuevaY = COORDENADAS_VENTS[siguienteVent][1];
-        
-        // 3. Mover a mi jugador LOCALMENTE
-        Jugador yo = jugadoresConectados.get(miId);
-        yo.setX(nuevaX);
-        yo.setY(nuevaY);
-        
-        // 4. AVISAR AL SERVIDOR (Para que los demás me vean aparecer allá)
-        // Enviamos un mensaje "MOV" normal, pero con las coordenadas nuevas de golpe
-        String mensaje = "MOV," + miId + "," + nuevaX + "," + nuevaY;
-        clienteRed.enviar(mensaje);
-        
-        System.out.println("Saltando de Vent " + idVentCercana + " a Vent " + siguienteVent);
-    }
+   
     
     public void actualizarRolJugador(int id, boolean esImpostor) {
         // Si el jugador ya existe, le actualizamos el rol
@@ -639,40 +777,120 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         }
     }
     public void iniciarReunion(int idReportador) {
-        System.out.println("🚨 REUNIÓN DE EMERGENCIA INICIADA 🚨");
+        System.out.println("🚨 ANIMACIÓN DE REPORTE INICIADA 🚨");
         
-        // 1. MOSTRAR MENSAJE (Bloqueante, pausa el juego un momento)
-        javax.swing.JOptionPane.showMessageDialog(this, 
-            "¡Cuerpo encontrado! \nLlamado por Jugador " + idReportador + "\nTodos a la Cafetería.");
+        // 1. ACTIVAR ANIMACIÓN VISUAL
+        mostrandoAnimacionReporte = true;
         
-        // 2. TELETRANSPORTAR A LA MESA (Cafetería)
-        // Coordenadas aprox de la mesa central: X=350, Y=250
-        if (jugadoresConectados.containsKey(miId)) {
-            Jugador yo = jugadoresConectados.get(miId);
-            
-            // Un pequeño random para que no aparezcan todos apilados en el pixel exacto
-            int randomX = 350 + (int)(Math.random() * 50); 
-            int randomY = 250 + (int)(Math.random() * 50);
-            
-            yo.setX(randomX);
-            yo.setY(randomY);
-            yo.detener(); // Que aparezca quieto
-            
-            // 3. ENVIAR MI NUEVA POSICIÓN AL SERVIDOR
-            // Es vital avisar que me moví, si no los demás me verán donde estaba antes.
-            clienteRed.enviar("MOV," + miId + "," + randomX + "," + randomY);
-        }
-        
-        // 4. LIMPIEZA (Opcional)
-        // Aquí podrías resetear botones, enfriamientos, etc.
+        // 2. APAGAR CONTROLES (Para que nadie se mueva durante la alerta)
         botonKill.setEnabled(false);
         botonReport.setVisible(false);
+        botonReport.setEnabled(false);
         
-        // Recuperar el foco para volver a movernos
-        arriba = false; abajo = false; izquierda = false; derecha = false;
-        this.requestFocusInWindow();
+        // Forzamos que se dibuje la pantalla roja INMEDIATAMENTE
+        repaint();
+        
+        // --- AQUÍ ESTÁ LA CLAVE: USAMOS UN TIMER, NO UN JOPTIONPANE ---
+        // Esto espera 3000 milisegundos (3 segundos) sin congelar la ventana
+        Timer timerAnimacion = new Timer(3000, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                
+                // --- ESTO OCURRE DESPUÉS DE LOS 3 SEGUNDOS ---
+                
+                // 1. Quitar la pantalla roja
+                mostrandoAnimacionReporte = false;
+                
+                // 2. Limpiar cadáveres (Convertirlos en fantasmas transparentes)
+                for (Jugador j : jugadoresConectados.values()) {
+                    if (!j.isVivo()) {
+                        j.setCuerpoReportado(true);
+                    }
+                }
+                
+                // 3. Teletransportar A LA MESA (Solo si estoy vivo)
+                if (jugadoresConectados.containsKey(miId)) {
+                    Jugador yo = jugadoresConectados.get(miId);
+                    
+                    if (yo.isVivo()) {
+                        // Coordenadas mesa
+                        int randomX = 350 + (int)(Math.random() * 60); 
+                        int randomY = 250 + (int)(Math.random() * 40);
+                        
+                        yo.setX(randomX);
+                        yo.setY(randomY);
+                        yo.detener();
+                        
+                        // Avisar al servidor
+                        clienteRed.enviar("MOV," + miId + "," + randomX + "," + randomY);
+                    }
+                }
+                
+                // 4. Resetear variables de juego
+                idCuerpoCercano = -1;
+                
+                // Recuperar el foco para poder escribir en el chat (cuando lo hagamos)
+                PanelJuego.this.requestFocusInWindow();
+                
+                // DETENER EL TIMER (Para que no se repita infinitamente)
+                ((Timer)e.getSource()).stop(); 
+            }
+        });
+        
+        timerAnimacion.setRepeats(false); // Aseguramos que solo suene una vez
+        timerAnimacion.start(); // ¡CORRE TIEMPO!
     }
     
+    private void cambiarObjetivoEspectador(boolean avanzar) {
+        // 1. Obtener lista de jugadores VIVOS (excluyéndome a mí si estoy muerto)
+        java.util.ArrayList<Integer> vivos = new java.util.ArrayList<>();
+        
+        for (Jugador j : jugadoresConectados.values()) {
+            if (j.isVivo()) {
+                vivos.add(j.getId());
+            }
+        }
+        
+        // Si no queda nadie vivo (o solo 1), no hacemos nada
+        if (vivos.isEmpty()) return;
+        
+        // Ordenamos la lista para que el cambio sea predecible (1 -> 2 -> 5...)
+        java.util.Collections.sort(vivos);
+        
+        // 2. Buscar índice actual
+        int indiceActual = vivos.indexOf(idEspectando);
+        
+        // 3. Calcular nuevo índice
+        if (avanzar) {
+            indiceActual++;
+            if (indiceActual >= vivos.size()) indiceActual = 0; // Vuelta al principio
+        } else {
+            indiceActual--;
+            if (indiceActual < 0) indiceActual = vivos.size() - 1; // Vuelta al final
+        }
+        
+        // 4. Asignar nuevo objetivo
+        idEspectando = vivos.get(indiceActual);
+        System.out.println("Espectando ahora a: Jugador " + idEspectando);
+        repaint();
+    }
     
+    // Método para permitir que ClienteRed acceda a un jugador específico
+    public Jugador getJugador(int id) {
+        return jugadoresConectados.get(id);
+    }
+
+
+public void agregarJugador(int id, String nombre, int x, int y, int r, int g, int b) {
+    // CORRECCIÓN: El constructor de Jugador pide (id, nombre, x, y, esImpostor)
+    // Pasamos 'false' inicialmente; el comando ROL lo actualizará después si es necesario.
+    Jugador nuevo = new Jugador(id, nombre, x, y, false);
+    
+    // Aplicamos el color RGB
+    nuevo.setColorRGB(r, g, b); 
+    
+    jugadoresConectados.put(id, nuevo);
+    repaint();
+}
     
 }

@@ -3,11 +3,12 @@ package starina_among_us.red;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 public class Servidor {
 
     private static final int PUERTO = 12345;
-    private static ArrayList<HiloCliente> clientes = new ArrayList<>();
+    private static CopyOnWriteArrayList<HiloCliente> clientes = new CopyOnWriteArrayList<>();
     
     // CONTADOR DE JUGADORES (Para dar IDs únicos: 1, 2, 3...)
     private static int contadorIds = 1;
