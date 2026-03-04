@@ -4,7 +4,7 @@
  */
 package starina_among_us;
 
-import starina_among_us.vista.VentanaJuego;
+import starina_among_us.vista.VentanaMenu;
 /**
  *
  * @author AveRy
@@ -16,8 +16,8 @@ public class Starina_Among_US {
      */
     public static void main(String[] args) {
         // Creamos y mostramos la ventana
-        VentanaJuego ventana = new VentanaJuego();
-        ventana.setVisible(true);
+        VentanaMenu menu = new VentanaMenu();
+        menu.setVisible(true);
     }
     
 }

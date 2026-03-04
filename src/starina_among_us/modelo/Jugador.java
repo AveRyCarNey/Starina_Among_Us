@@ -211,6 +211,7 @@ public class Jugador {
         this.cuerpoReportado = reportado;
     }
     public String getNombre(){return this.nombre;}
+    public boolean getEsImpostor(){return this.esImpostor;}
     public boolean isCuerpoReportado() {
     return cuerpoReportado;
 }
