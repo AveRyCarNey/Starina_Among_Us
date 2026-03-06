@@ -10,6 +10,7 @@ public class VentanaJuego extends JFrame {
         setSize(800, 600);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         
+        
         // Le pasamos todo al panel
         PanelJuego panel = new PanelJuego(mapa, ip, nombre, color, esHost);
         add(panel);

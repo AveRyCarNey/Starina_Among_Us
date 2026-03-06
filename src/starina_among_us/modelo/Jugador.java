@@ -24,8 +24,9 @@ public class Jugador {
     
     // ESTADOS
     private boolean moviendose = false; 
-    private boolean mirandoDerecha = true; // NUEVO: Para saber a dónde mira
+    private boolean mirandoDerecha = true; 
     private boolean cuerpoReportado = false;
+    private boolean haVotado = false;
     
     // IMÁGENES
     private BufferedImage imgQuietoOriginal, imgMuertoOriginal;
@@ -42,6 +43,12 @@ public class Jugador {
     private final int ANCHO = 50; 
     private final int ALTO = 60;
     private int retardoAnimacion = 0;
+    
+    private boolean enVentilacion = false;
+    private boolean animandoVent = false;
+    
+    
+    private java.awt.Color colorOriginal;
 
     public Jugador(int id, String nombre, double x, double y, boolean esImpostor) {
         this.id = id;
@@ -53,8 +60,12 @@ public class Jugador {
         this.estaVivo = true;
         
         
+        
         // 1. Definimos el color por defecto (Rojo Among Us)
         this.colorPersonaje = new Color(197, 17, 17); 
+        
+        
+        this.colorOriginal = this.colorPersonaje;
         
         // 2. Cargamos los moldes (Originales)
         cargarImagenes();
@@ -231,31 +242,63 @@ public class Jugador {
         this.mirandoDerecha = mirandoDerecha;
     }
     
-    // Cambiamos el nombre para que no choque con setters automáticos y sea más claro
-public void setColorManual(int colorID) {
-    Color realColor;
-    // Lista de colores según el ID
-    switch(colorID) {
-        case 1: realColor = Color.BLUE; break;
-        case 2: realColor = Color.GREEN; break;
-        case 3: realColor = Color.YELLOW; break;
-        case 4: realColor = Color.PINK; break;
-        case 5: realColor = Color.CYAN; break;
-        default: realColor = new Color(197, 17, 17); break; // Rojo original
+    public boolean isHaVotado() {
+        return haVotado;
+    }
+
+    public void setHaVotado(boolean haVotado) {
+        this.haVotado = haVotado;
     }
     
-    this.colorPersonaje = realColor;
-    // Llamamos a cambiarSkin para regenerar las imágenes con el nuevo color
-    this.cambiarSkin(realColor); 
-}
-
-public void setColorRGB(int r, int g, int b) {
-    // Guardamos el objeto Color real
-    this.colorPersonaje = new Color(r, g, b);
+    public boolean isEnVentilacion() {
+        return enVentilacion;
+    }
+    public void setEnVentilacion(boolean enVentilacion) {
+        this.enVentilacion = enVentilacion;
+    }
     
-    // Ejecutamos la lógica de pintado de frames
-    this.cambiarSkin(this.colorPersonaje);
-}
+    public void setColorManual(int colorID) {
+        Color realColor;
+        switch(colorID) {
+            case 1: realColor = Color.BLUE; break;
+            case 2: realColor = Color.GREEN; break;
+            case 3: realColor = Color.YELLOW; break;
+            case 4: realColor = Color.PINK; break;
+            case 5: realColor = Color.CYAN; break;
+            default: realColor = new Color(197, 17, 17); break; 
+        }
+        
+        this.colorPersonaje = realColor;
+        this.colorOriginal = realColor; // <-- ¡NUEVO: Actualizamos el color original!
+        this.cambiarSkin(realColor); 
+    }
+
+    public void setColorRGB(int r, int g, int b) {
+        this.colorPersonaje = new Color(r, g, b);
+        this.colorOriginal = this.colorPersonaje; // <-- ¡NUEVO: Actualizamos el color original!
+        this.cambiarSkin(this.colorPersonaje);
+    }
+public Color getColor() {
+        return this.colorPersonaje;
+    }
+
+// Método para recuperar el color original
+    public java.awt.Color getColorOriginal() {
+        return this.colorOriginal;
+    }
+
+    // Método para cambiar el color temporalmente durante la tarea
+    public void setColorTemporal(java.awt.Color nuevoColor) {
+        this.colorPersonaje = nuevoColor; // Cambia "this.color" por tu variable real si se llama distinto
+        
+        this.cambiarSkin(nuevoColor);
+    }
 
     
+public boolean isAnimandoVent() {
+    return animandoVent;
+}
+public void setAnimandoVent(boolean animandoVent) {
+    this.animandoVent = animandoVent;
+}
 }

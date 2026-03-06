@@ -62,6 +62,7 @@ for (HiloCliente otro : listaTodos) {
                            otro.mirandoDerecha;
         
         this.enviarMensaje(msjSincro);
+        this.enviarMensaje("ROL," + otro.id + "," + otro.esImpostor);
         
         if (!otro.estaVivo) {
             this.enviarMensaje("MUERTE," + otro.id);
@@ -93,6 +94,8 @@ if (comando.equals("HOLA")) {
                                   this.r + "," + this.g + "," + this.b + "," + 
                                   this.nombre + "," + this.mirandoDerecha;
             otro.enviarMensaje(presentacion);
+            
+            otro.enviarMensaje("ROL," + this.id + "," + this.esImpostor);
         }
     }
 }
@@ -127,6 +130,13 @@ if (comando.equals("HOLA")) {
                 
                 else if (comando.equals("REPORT")) {
                     broadcast("REUNION," + this.id, null);
+                }
+                
+                else if (comando.equals("RESET_SERVER")) {
+                    // El Host ordenó limpiar la sala para una nueva partida
+                    System.out.println("♻️ REINICIANDO EL SERVIDOR PARA NUEVA PARTIDA...");
+                    listaTodos.clear(); 
+                    // Si tienes otras listas estáticas en el servidor (como votos o tareas), límpialas aquí también.
                 }
                 
                 // Reenvío general para cualquier otro mensaje

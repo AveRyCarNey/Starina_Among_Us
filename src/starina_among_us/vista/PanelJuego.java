@@ -22,7 +22,9 @@ import starina_among_us.red.ClienteRed;
 
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.HashMap;
 import javax.swing.JProgressBar;
+import starina_among_us.modelo.GestorSonido;
 
 public class PanelJuego extends JPanel implements KeyListener, ActionListener, FocusListener {
 
@@ -85,16 +87,9 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     private boolean juegoIniciado = false;
     private boolean soyHost = false;
     private JButton botonIniciarPartida;
-    private final int MIN_JUGADORES = 2; 
+    private final int MIN_JUGADORES = 5; 
     
-    // --- VARIABLES DE MISIONES ---
-    private JButton botonUsar;
-    private JProgressBar barraMisiones;
-    private boolean[] misMisionesCompletadas; 
-    private int totalMisionesGlobales = 1; // Para evitar división por cero
-    private int misionesCompletadasGlobales = 0;
-    private ArrayList<Point> listaMisiones = new ArrayList<>();
-    private int idMisionCercana = -1;
+    
     private JButton botonUse;
     
     // --- VARIABLES DE VENTILACIÓN ---
@@ -104,6 +99,79 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     
     private java.awt.image.BufferedImage imgVentHole;
     
+    // --- VARIABLES DE LA TABLET DE REUNIÓN ---
+    private boolean mostrandoTabletReunion = false;
+    private int tiempoRestanteReunion = 120; 
+    private Timer timerReunion; 
+    private int idVotadoSeleccionado = -1; 
+    private boolean yaVote = false; 
+    
+    // NUEVAS VARIABLES DE IMÁGENES
+    private java.awt.image.BufferedImage imgTabletFondo;
+    private java.awt.image.BufferedImage imgVoteConfirmar;
+    private java.awt.image.BufferedImage imgVoteCancelar;
+    private java.awt.image.BufferedImage imgVoteSkip;
+    private java.awt.image.BufferedImage imgVoteMegafono;
+    private java.awt.image.BufferedImage imgVoteIVoted;
+    private java.awt.image.BufferedImage imgVoteTripulante;
+    
+    // --- VARIABLES DEL CHAT DE REUNIÓN ---
+    private javax.swing.JButton botonAbrirChat;
+    private javax.swing.JScrollPane scrollChat;
+    private javax.swing.JTextArea areaChat;
+    private javax.swing.JTextField campoChat;
+    private boolean chatAbierto = false;
+    
+    // --- VARIABLES DE LA EXPULSIÓN Y VOTOS ---
+    private HashMap<Integer, Integer> registroVotos = new HashMap<>(); // Quién votó -> Por quién
+    
+    private java.awt.image.BufferedImage imgFondoEjected;
+    private java.awt.image.BufferedImage imgCharEjectedOriginal;
+    private java.awt.image.BufferedImage imgCharEjectedPintado;
+    
+    private boolean mostrandoAnimacionExpulsion = false;
+    private Timer timerExpulsion;
+    private double expulsionX = -100; // Posición horizontal del cuerpo flotando
+    private double expulsionAngulo = 0; // Rotación
+    private String textoExpulsion = "";
+    private int charsMostradosExpulsion = 0; // Para el efecto de "máquina de escribir"
+    private int idExpulsadoActual = -1;
+    
+    // Caché para no pintar los iconos 60 veces por segundo y evitar LAG
+    private HashMap<Integer, BufferedImage> iconosPintadosTablet = new HashMap<>();
+    
+    // NUEVO: Para saber a quién ponerle el megáfono
+    private int idReportadorActual = -1;
+    
+    // --- VARIABLES DE FIN DE JUEGO ---
+    private boolean juegoTerminado = false;
+    private boolean victoriaLocal = false; // ¿Ganó mi equipo?
+    private BufferedImage imgVictoriaFondo;
+    private BufferedImage imgDerrotaFondo;
+    
+    // NUEVAS: Para la transición de oscurecimiento
+    private boolean animandoFinDeJuego = false;
+    private float opacidadFinJuego = 0.0f;
+    private Timer timerFinDeJuego;
+    
+    // NUEVAS: Para la Fase 2 de la animación
+    private float opacidadImagenFin = 0.0f;
+    private String textoGanadores = "";
+    
+    // --- VARIABLES DE LOS GANADORES EN PANTALLA ---
+    private java.awt.image.BufferedImage imgBaseGanador;
+    private java.util.ArrayList<java.awt.image.BufferedImage> spritesGanadores = new java.util.ArrayList<>();
+    private java.util.ArrayList<String> nombresGanadores = new java.util.ArrayList<>();
+    
+    private JButton botonQuit;
+    
+    
+    private starina_among_us.modelo.GestorTareas gestorTareas = new starina_among_us.modelo.GestorTareas();
+    private starina_among_us.modelo.Tarea tareaActualEnZona = null; // Para saber qué tarea tenemos enfrente
+    
+    public starina_among_us.modelo.GestorTareas getGestorTareas() { return gestorTareas; }
+    
+    private int contadorPasos = 0;
     
     
 
@@ -153,14 +221,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         });
         add(botonIniciarPartida);
         
-        // --- BARRA DE MISIONES ---
-        barraMisiones = new JProgressBar(0, 100);
-        barraMisiones.setBounds(10, 10, 300, 25);
-        barraMisiones.setValue(0);
-        barraMisiones.setStringPainted(true);
-        barraMisiones.setForeground(new Color(50, 200, 50));
-        barraMisiones.setBackground(Color.DARK_GRAY);
-        add(barraMisiones);
+        
 
         // --- BOTÓN USAR / MISIÓN ---
         botonUse = new JButton();
@@ -169,7 +230,72 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         botonUse.setBorderPainted(false);
         botonUse.setFocusPainted(false);
         botonUse.setEnabled(false); // Apagado por defecto
-        botonUse.addActionListener(e -> realizarMisionAutomatica());
+        
+        botonUse.addActionListener(e -> {
+            if (tareaActualEnZona == null) return; // Seguridad extra
+            
+            // --- TAREA 1: EL LABORATORIO ---
+            if (tareaActualEnZona.getId().equals("LAB_FRASCOS")) {
+                System.out.println("🧪 Bebiendo sustancia desconocida...");
+                tareaActualEnZona.setCompletada(true); 
+                botonUse.setEnabled(false); 
+                
+                // Animación de colores (5 segundos)
+                javax.swing.Timer timerRave = new javax.swing.Timer(1000, null);
+                int[] contador = {0};
+
+                timerRave.addActionListener(ev -> {
+                    contador[0]++;
+                    if (contador[0] <= 5) {
+                        int r = (int)(Math.random() * 255);
+                        int g = (int)(Math.random() * 255);
+                        int b = (int)(Math.random() * 255);
+                        Color colorLoco = new Color(r, g, b);
+                        
+                        aplicarColorRave(miId, colorLoco);
+                        clienteRed.enviar("COLOR_RAVE," + miId + "," + r + "," + g + "," + b);
+                    } else {
+                        Color colorReal = miJugador.getColorOriginal();
+                        aplicarColorRave(miId, colorReal);
+                        clienteRed.enviar("COLOR_RAVE," + miId + "," + colorReal.getRed() + "," + colorReal.getGreen() + "," + colorReal.getBlue());
+    
+                        // --- NUEVA LÓGICA DE REGISTRO ---
+                        boolean esNueva = gestorTareas.registrarTareaCompletada("LAB_FRASCOS");
+                        if (esNueva) {
+                            clienteRed.enviar("TAREA_LISTA,LAB_FRASCOS");
+                            GestorSonido.jugar("general_sounds/task_Complete.wav");
+                            verificarFinDeJuego();
+                        }
+    
+                        ((javax.swing.Timer)ev.getSource()).stop();
+                    }
+                });
+                timerRave.start();
+            } 
+            
+            // --- TAREA 2: LA OFICINA DEL PROFESOR ---
+            else if (tareaActualEnZona.getId().equals("OFI_TRABAJO")) {
+                System.out.println("📄 Abriendo minijuego de ordenar hojas...");
+                
+                // Creamos la ventana emergente y la hacemos visible
+                starina_among_us.vista.VistaMisionOficina minijuego = new starina_among_us.vista.VistaMisionOficina(PanelJuego.this);
+                minijuego.setVisible(true); 
+            }
+            
+            // --- TAREA 3: LA PIZARRA DE MATEMÁTICAS ---
+            else if (tareaActualEnZona.getId().equals("PIZARRA_MATH")) {
+                System.out.println("🧮 Abriendo el examen sorpresa...");
+                starina_among_us.vista.VistaMisionPizarra minijuego = new starina_among_us.vista.VistaMisionPizarra(PanelJuego.this);
+                minijuego.setVisible(true); 
+            }
+            // --- TAREA 4: LA BIBLIOTECA ---
+            else if (tareaActualEnZona.getId().equals("BIBLIO_LIBROS")) {
+                System.out.println("📚 Abriendo estantería de libros...");
+                starina_among_us.vista.VistaMisionBiblioteca minijuego = new starina_among_us.vista.VistaMisionBiblioteca(PanelJuego.this);
+                minijuego.setVisible(true); 
+            }
+        });
+        
         botonUse.setFocusable(false);
         
         // 1. BOTÓN KILL (Abajo Derecha)
@@ -205,8 +331,91 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         botonReport.setEnabled(false);
         
         
+        // --- BOTÓN QUIT (Para salir al final del juego) ---
+        botonQuit = new JButton();
+        botonQuit.setBounds(650, 400, 125, 142); // Ubicado abajo a la derecha
+        botonQuit.setContentAreaFilled(false);
+        botonQuit.setBorderPainted(false);
+        botonQuit.setFocusPainted(false);
+        botonQuit.setVisible(false); // Invisible hasta que termine la partida
+        botonQuit.setFocusable(false);
         
-        // Importante: No lo añadas al panel si el jugador es Fantasma (eso lo validaremos después)
+        botonQuit.addActionListener(e -> {
+            System.out.println("🚪 Limpiando la sala y saliendo al Menú Principal...");
+            
+            // 1. Si soy el HOST, le ordeno al servidor que borre la memoria de esta partida
+            if (soyHost && clienteRed != null) {
+                clienteRed.enviar("RESET_SERVER");
+            }
+            
+            // 2. Apagamos nuestra propia conexión a internet
+            if (clienteRed != null) {
+                clienteRed.desconectar();
+            }
+            
+            // 3. Limpiamos nuestras variables locales por si acaso
+            jugadoresConectados.clear();
+            registroVotos.clear();
+            
+            // 4. Cerramos la ventana actual
+            javax.swing.SwingUtilities.getWindowAncestor(this).dispose();
+            
+            // 5. Volvemos al menú
+            new VentanaMenu().setVisible(true);
+        });
+        
+        this.add(botonQuit);
+        
+        
+        // --- 1. ÁREA DE MENSAJES (JTextArea) ---
+        areaChat = new javax.swing.JTextArea();
+        areaChat.setEditable(false);
+        areaChat.setLineWrap(true);
+        areaChat.setWrapStyleWord(true);
+        areaChat.setFont(new Font("Arial", Font.BOLD, 14));
+        areaChat.setBackground(new Color(220, 230, 240)); // Un celeste muy clarito
+        areaChat.setForeground(Color.BLACK);
+        
+        // Le ponemos una barra de desplazamiento
+        scrollChat = new javax.swing.JScrollPane(areaChat);
+        scrollChat.setBounds(480, 110, 250, 320); // Ubicado a la derecha de la tablet
+        scrollChat.setVisible(false); // Invisible al inicio
+        this.add(scrollChat);
+
+        // --- 2. CAMPO PARA ESCRIBIR (JTextField) ---
+        campoChat = new javax.swing.JTextField();
+        campoChat.setBounds(480, 440, 250, 35);
+        campoChat.setFont(new Font("Arial", Font.PLAIN, 16));
+        campoChat.setVisible(false);
+        
+        // Al presionar ENTER en el campo de texto, se envía el mensaje
+        campoChat.addActionListener(e -> {
+            enviarMensajeChat();
+        });
+        this.add(campoChat);
+
+        // --- 3. BOTÓN PARA ABRIR/CERRAR EL CHAT ---
+        botonAbrirChat = new javax.swing.JButton(); // Sin texto
+        botonAbrirChat.setBounds(650, 60, 55, 59); // Tamaño exacto de tu recorte
+        botonAbrirChat.setContentAreaFilled(false);
+        botonAbrirChat.setBorderPainted(false);
+        botonAbrirChat.setFocusPainted(false);
+        botonAbrirChat.setVisible(false);
+        botonAbrirChat.setFocusable(false);
+        
+        botonAbrirChat.addActionListener(e -> {
+            chatAbierto = !chatAbierto; // Alternar estado
+            scrollChat.setVisible(chatAbierto);
+            
+            // --- NUEVO: Solo mostramos la caja de texto si ESTOY VIVO ---
+            if (chatAbierto && miJugador != null && miJugador.isVivo()) {
+                campoChat.setVisible(true);
+                campoChat.requestFocus(); // Poner el cursor listo
+            } else {
+                campoChat.setVisible(false); // Los muertos no tienen teclado
+            }
+        });
+        this.add(botonAbrirChat);
         
         
 
@@ -226,6 +435,10 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 
                 //USE: 1150, 112 | 113x116
                 BufferedImage imgUse = starina_among_us.modelo.HerramientasImagen.recortar(hojaBotones, 1150, 112, 113, 116);
+                
+                // QUIT: 124, 5 | 125x142 
+                BufferedImage imgQuit = starina_among_us.modelo.HerramientasImagen.recortar(hojaBotones, 124, 5, 125, 142);
+                botonQuit.setIcon(new ImageIcon(imgQuit));
                 
                 // Transparencias (50%)
                 BufferedImage killGris = starina_among_us.modelo.HerramientasImagen.hacerTransparente(imgKill, 0.5f);
@@ -260,6 +473,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         
         botonKill.addActionListener(e -> {
             if (idVictimaCercana != -1) {
+                GestorSonido.jugar("impostor_kill.wav");
                 clienteRed.enviar("MATAR," + idVictimaCercana);
                 botonKill.setEnabled(false);
                 idVictimaCercana = -1;
@@ -268,34 +482,46 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         });
 
         botonVent.addActionListener(e -> {
-            System.out.println("🔘 CLIC EN VENT! enVentilacion: " + enVentilacion + " | animando: " + animandoVent);
-            if (animandoVent) return; // Si se está moviendo, ignorar clics
+            if (animandoVent) return; 
 
             if (!enVentilacion) {
                 System.out.println("⬇️ BAJANDO A LA ALCANTARILLA...");
                 animandoVent = true;
-                enVentilacion = true;
+                enVentilacion = true; 
+                
+                // NUEVO: Me marco en animación y aviso a la red
+                miJugador.setAnimandoVent(true);
+                GestorSonido.jugar("Vent/ventGroundEnter.wav");
+                clienteRed.enviar("VENT_ANIM," + miId + ",true");
+                
                 if (idVentCercana == -1 || idVentCercana >= listaVents.size()) idVentCercana = 0;
                 ventActualIndex = idVentCercana;
 
                 java.awt.Point v = listaVents.get(ventActualIndex);
-                
                 int miOffsetX = 18;
-                // Centramos al jugador (El centro del hueco menos la mitad del jugador)
+                
                 miJugador.setX(v.x - 25 + miOffsetX);
-                // Ponemos los pies exactamente en la parte superior del hueco
                 miJugador.setY(v.y - 55);
+                clienteRed.enviar("MOV," + miId + "," + (int)miJugador.getX() + "," + (int)miJugador.getY() + "," + miJugador.isMirandoDerecha() + ",false");
 
                 javax.swing.Timer t = new javax.swing.Timer(20, null);
                 int[] frames = {0};
                 t.addActionListener(ev -> {
-                    miJugador.setY(miJugador.getY() + 2); // Bajando
+                    miJugador.setY(miJugador.getY() + 2); 
                     frames[0]++;
+                    clienteRed.enviar("MOV," + miId + "," + (int)miJugador.getX() + "," + (int)miJugador.getY() + "," + miJugador.isMirandoDerecha() + ",false");
                     repaint();
-                    // Subimos los frames a 35 para que baje 70 píxeles y se hunda completo
+                    
                     if (frames[0] >= 35) { 
                         t.stop();
                         animandoVent = false;
+                        
+                        // NUEVO: Terminé de animar, apago la variable
+                        miJugador.setAnimandoVent(false);
+                        clienteRed.enviar("VENT_ANIM," + miId + ",false");
+                        
+                        clienteRed.enviar("VENT," + miId + ",true");
+                        miJugador.setEnVentilacion(true);
                     }
                 });
                 t.start();
@@ -304,25 +530,32 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 System.out.println("⬆️ SUBIENDO A LA SUPERFICIE...");
                 animandoVent = true;
                 
-                // --- TU OFFSET MÁGICO ---
-                int miOffsetX = 18; 
+                // NUEVO: Me marco en animación y aviso a la red
+                miJugador.setAnimandoVent(true);
+                clienteRed.enviar("VENT_ANIM," + miId + ",true");
                 
+                clienteRed.enviar("VENT," + miId + ",false");
+                miJugador.setEnVentilacion(false);
+                
+                int miOffsetX = 18; 
                 javax.swing.Timer t = new javax.swing.Timer(20, null);
                 int[] frames = {0};
                 t.addActionListener(ev -> {
-                    // Mantenemos la X alineada con el hueco mientras sube
                     java.awt.Point v = listaVents.get(ventActualIndex);
                     miJugador.setX(v.x - 25 + miOffsetX); 
-                    
-                    miJugador.setY(miJugador.getY() - 2); // Subiendo...
+                    miJugador.setY(miJugador.getY() - 2); 
                     frames[0]++;
+                    clienteRed.enviar("MOV," + miId + "," + (int)miJugador.getX() + "," + (int)miJugador.getY() + "," + miJugador.isMirandoDerecha() + ",false");
                     repaint();
                     
-                    if (frames[0] >= 35) { // Debe coincidir con los frames de bajada
+                    if (frames[0] >= 35) { 
                         t.stop();
                         animandoVent = false;
                         enVentilacion = false; 
-                        System.out.println("✅ Terminó de SUBIR.");
+                        
+                        // NUEVO: Terminé de animar, apago la variable
+                        miJugador.setAnimandoVent(false);
+                        clienteRed.enviar("VENT_ANIM," + miId + ",false");
                     }
                 });
                 t.start();
@@ -336,11 +569,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             }
         });
         
-        // Lo que pasará cuando le des clic
-        botonUse.addActionListener(e -> {
-            System.out.println("¡Realizando tarea!");
-            // Aquí luego pondremos la lógica de abrir el minijuego
-        });
+        
 
         // --- AGREGAR AL PANEL ---
         this.add(botonKill);
@@ -388,15 +617,97 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                         ventActualIndex++;
                         if (ventActualIndex >= listaVents.size()) ventActualIndex = 0;
                     }
+                    GestorSonido.jugar("Vent/ventMoveGround1.wav");
                     
                     // Teletransportar al jugador (mantenemos su Y sumado en 50 para que siga "hundido")
-                    java.awt.Point nuevaVent = listaVents.get(ventActualIndex);
+                    Point nuevaVent = listaVents.get(ventActualIndex);
                     int miOffsetX = 18; 
                     
                     miJugador.setX(nuevaVent.x - 25 + miOffsetX); 
                     miJugador.setY(nuevaVent.y - 55 + 50);
                     
+                    clienteRed.enviar("MOV," + miId + "," + (int)miJugador.getX() + "," + (int)miJugador.getY() + "," + miJugador.isMirandoDerecha() + ",false");
+                    
                     repaint(); // La cámara saltará a la nueva vent
+                }
+                // 3. MODO VOTACIÓN (Si la tablet está abierta y aún no he votado)
+                else if (mostrandoTabletReunion && !mostrandoAnimacionReporte && !yaVote) {
+                    
+                    int mx = e.getX();
+                    int my = e.getY();
+                    
+                    // Recreamos las matemáticas de la pantalla para saber dónde están los botones
+                    int tabletW = 750, tabletH = 550, padding = 45;
+                    int tabletX = (getWidth() - tabletW) / 2;
+                    int tabletY = (getHeight() - tabletH) / 2;
+                    int screenX = tabletX + padding;
+                    int screenY = tabletY + padding;
+                    int screenW = tabletW - (padding * 2);
+                    int screenH = tabletH - (padding * 2);
+                    
+                    // --- A) ¿CLIC EN SKIP VOTE? ---
+                    int skipX = screenX + 10;
+                    int skipY = screenY + screenH - 35;
+                    if (mx >= skipX && mx <= skipX + 110 && my >= skipY && my <= skipY + 25) {
+                        System.out.println("🗳️ Has votado por SKIP VOTE");
+                        idVotadoSeleccionado = -2; // -2 significará Skip
+                        yaVote = true;
+                        
+                        jugadoresConectados.get(miId).setHaVotado(true);
+                        clienteRed.enviar("VOTO," + miId + "," + idVotadoSeleccionado);
+                        
+                        repaint();
+                        return;
+                    }
+                    
+                    // --- B) ¿CLIC EN LOS JUGADORES? ---
+                    int boxW = 280, boxH = 45, espaciadoColumnas = 20, espaciadoFilas = 55;
+                    int startX = screenX + (screenW - (boxW * 2 + espaciadoColumnas)) / 2;
+                    int startY = screenY + 70;
+                    
+                    int col = 0, row = 0;
+                    for (Jugador j : jugadoresConectados.values()) {
+                        int drawX = startX + (col * (boxW + espaciadoColumnas));
+                        int drawY = startY + (row * espaciadoFilas);
+                        
+                        // ¿El clic chocó con esta caja?
+                        if (mx >= drawX && mx <= drawX + boxW && my >= drawY && my <= drawY + boxH) {
+                            
+                            if (!j.isVivo()) return; // No se puede votar a los muertos
+                            
+                            // --- NUEVA REGLA: NO AUTO-VOTO ---
+                            if (j.getId() == miId) {
+                                System.out.println("🚫 No puedes votarte a ti mismo.");
+                                return; // Ignoramos el clic por completo
+                            }
+                            
+                            // Si ya lo tenía seleccionado, reviso si hizo clic en los botones
+                            if (idVotadoSeleccionado == j.getId()) {
+                                
+                                // ¿Clic en Confirmar? (Check verde)
+                                if (mx >= drawX + boxW - 100 && mx <= drawX + boxW - 60) {
+                                    System.out.println("🗳️ Voto confirmado para: " + j.getNombre());
+                                    yaVote = true;
+                                    
+                                    jugadoresConectados.get(miId).setHaVotado(true);
+                                    clienteRed.enviar("VOTO," + miId + "," + idVotadoSeleccionado);
+                                }
+                                // ¿Clic en Cancelar? (X roja)
+                                else if (mx >= drawX + boxW - 50 && mx <= drawX + boxW - 10) {
+                                    idVotadoSeleccionado = -1; // Deseleccionar
+                                }
+                                
+                            } else {
+                                // Seleccionar a este nuevo jugador
+                                idVotadoSeleccionado = j.getId();
+                            }
+                            repaint();
+                            return;
+                        }
+                        
+                        col++;
+                        if (col > 1) { col = 0; row++; }
+                    }
                 }
             }
         });
@@ -431,21 +742,53 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             System.out.println("❌ EXCEPCIÓN AL CARGAR IMAGEN: " + e.getMessage());
             e.printStackTrace();
         }
+        
+        // --- CARGAR ASSETS DE VOTACIÓN ---
+        try {
+            java.awt.image.BufferedImage hojaVotacion = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/eventos/Voting2.png"));
+            imgTabletFondo = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 8, 7, 856, 581);
+            imgVoteConfirmar = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 570, 665, 48, 50);
+            imgVoteCancelar = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 511, 665, 50, 50);
+            imgVoteSkip = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 995, 665, 110, 25);
+            imgVoteMegafono = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 359, 665, 70, 62);
+            imgVoteIVoted = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 241, 665, 36, 35);
+            imgVoteTripulante = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 8, 665, 55, 45);
+            
+            java.awt.image.BufferedImage imgIconoChat = starina_among_us.modelo.HerramientasImagen.recortar(hojaVotacion, 628, 665, 55, 59);
+            botonAbrirChat.setIcon(new javax.swing.ImageIcon(imgIconoChat));
+            System.out.println("✅ Tablet de votación cargada con éxito.");
+        } catch (Exception e) {
+            System.out.println("❌ Error cargando Voting.png: " + e.getMessage());
+        }
+        
+        // --- CARGAR ASSETS DE EXPULSIÓN ---
+        try {
+            imgFondoEjected = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/eventos/ejected.png"));
+            imgCharEjectedOriginal = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/eventos/Ejected_character.png"));
+        } catch (Exception e) {
+            System.out.println("❌ Error cargando assets de expulsión: " + e.getMessage());
+        }
+        
+        // --- CARGAR ASSETS DE FIN DE JUEGO ---
+        try {
+            imgVictoriaFondo = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/eventos/win.jpg"));
+            imgDerrotaFondo = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/eventos/defeat.jpg"));
+            imgBaseGanador = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/personajes/rozul.png"));
+        } catch (Exception e) {
+            System.out.println("❌ Error cargando pantallas de victoria/derrota: " + e.getMessage());
+        }
+        
+        
+        
     }
-    
+                
     public void iniciarPartidaLobby() {
-        this.juegoIniciado = true;
-        // Contamos cuántos tripulantes vivos hay y lo multiplicamos por los paneles verdes del mapa
-        int tripulantes = 0;
-        for (Jugador j : jugadoresConectados.values()) {
-            if (!j.getEsImpostor()) tripulantes++;
-        }
-        totalMisionesGlobales = tripulantes * listaMisiones.size();
-        if (botonIniciarPartida != null) {
-            botonIniciarPartida.setVisible(false); // Escondemos el botón
-        }
-        System.out.println("🚀 ¡LA PARTIDA HA COMENZADO!");
-    }
+     this.juegoIniciado = true;
+     if (botonIniciarPartida != null) {
+         botonIniciarPartida.setVisible(false);
+     }
+     System.out.println("🚀 ¡LA PARTIDA HA COMENZADO!");
+ }
     
     public void cargarMapa(String nombreMapa) {
     try {
@@ -526,13 +869,22 @@ while (!todosLosPixelesRojos.isEmpty()) {
             }
         }
         // Creamos una lista de "Falso/Verdadero" del mismo tamaño que las misiones encontradas
-        misMisionesCompletadas = new boolean[listaMisiones.size()];
+        
         System.out.println("✅ Mapa cargado. Tamaño Real: " + anchoReal + "x" + altoReal);
         System.out.println("✅ Spawn corregido en: " + spawnX + "," + spawnY + " | Vents: " + listaVents.size());
     } catch (Exception e) {
         System.out.println("❌ Error cargando el mapa: " + e.getMessage());
     }
 }
+    
+    public void registrarVotoRed(int idVotante, int idVotado) {
+     if (jugadoresConectados.containsKey(idVotante)) {
+         jugadoresConectados.get(idVotante).setHaVotado(true);
+         registroVotos.put(idVotante, idVotado); // Guardamos la decisión
+         repaint(); 
+     }
+ }
+    
     
     public boolean esPasoValido(double posX, double posY) {
         if (mapaDatos == null || fondoMapa == null) return true; 
@@ -629,27 +981,37 @@ while (!todosLosPixelesRojos.isEmpty()) {
             // --- 2. DIBUJAR JUGADORES Y APLICAR LA MÁSCARA AL ENTRAR ---
             for (Jugador j : jugadoresConectados.values()) {
                 
-                if (j.getId() == miId && enVentilacion) {
-                    if (!animandoVent) continue; // Si ya estoy al fondo, no me dibujo
-                    
-                    java.awt.Shape clipOriginal = g2.getClip();
-                    java.awt.Point v = listaVents.get(ventActualIndex);
-                    
-                    // Ajustamos el borde del hueco para la tijera de Java
-                    // v.y es el centro matemático del punto rojo. Le sumamos 10 para que 
-                    // te corte de la cintura para abajo cuando entres.
-                    int bordeHuecoY = v.y + 10; 
-                    
-                    // El primer parámetro es la X. Usamos la X del jugador - 50 para darle margen
-                    g2.clipRect((int)j.getX() - 50, 0, 150, bordeHuecoY);
-                    
-                    j.dibujar(g2, this); 
-                    
-                    g2.setClip(clipOriginal); 
-                } else {
-                    // Los demás jugadores se dibujan de forma normal
-                    j.dibujar(g2, this);
+                // 1. CERO FANTASMAS
+                if (!j.isVivo() && j.isCuerpoReportado()) continue; 
+                
+                // 2. OCULTAR SI ESTÁ TOTALMENTE EN VENTILACIÓN
+                if (j.isEnVentilacion()) {
+                    // Si soy yo mismo y NO me estoy animando (ya estoy al fondo), no me dibujo
+                    if (j.getId() == miId && !animandoVent) continue;
+                    // Si es OTRO jugador y está en ventilación, se vuelve invisible
+                    if (j.getId() != miId) continue;
                 }
+                
+                // 3. MÁSCARA AUTOMÁTICA (Solo si estoy animando la entrada/salida)
+                java.awt.Shape clipOriginal = g2.getClip();
+                boolean mascaraAplicada = false;
+
+                // ¡AQUÍ ESTÁ LA MAGIA! Solo calculamos el hueco si la variable está encendida
+                if (j.isAnimandoVent()) {
+                    for (java.awt.Point v : listaVents) {
+                        if (Math.abs(j.getX() + 25 - v.x) < 40 && Math.abs(j.getY() + 55 - v.y) < 80) {
+                            if (j.getY() + 55 > v.y - 10) {
+                                g2.clipRect((int)j.getX() - 50, 0, 150, v.y + 10);
+                                mascaraAplicada = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+                j.dibujar(g2, this); 
+                
+                if (mascaraAplicada) g2.setClip(clipOriginal);
             }
             
             // 3. CIRCULO DE MUERTE (Radar del impostor)
@@ -696,6 +1058,237 @@ while (!todosLosPixelesRojos.isEmpty()) {
                     g2.drawImage(imgReporteTexto, centroX - 150, centroY - 130, 300, 260, this);
                 }
             }
+            
+            // 6. TABLET DE REUNIÓN (UI Superpuesta)
+            if (mostrandoTabletReunion && !mostrandoAnimacionReporte) {
+                g2.setColor(new Color(0, 0, 0, 180));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                
+                if (imgTabletFondo != null) {
+                    // 1. DIBUJAR LA TABLET FÍSICA
+                    int tabletW = 750; 
+                    int tabletH = 550; 
+                    int tabletX = (getWidth() - tabletW) / 2;
+                    int tabletY = (getHeight() - tabletH) / 2;
+                    
+                    g2.drawImage(imgTabletFondo, tabletX, tabletY, tabletW, tabletH, this);
+                    
+                    // 2. DEFINIR EL "ÁREA DE PANTALLA CELESTE" 
+                    int padding = 45;
+                    int screenX = tabletX + padding;
+                    int screenY = tabletY + padding;
+                    int screenW = tabletW - (padding * 2);
+                    int screenH = tabletH - (padding * 2);
+                    
+                    // 3. TEXTOS GLOBALES Y SKIP VOTE
+                    g2.setColor(Color.BLACK);
+                    g2.setFont(new Font("Arial", Font.BOLD, 26));
+                    g2.drawString("Who Is The Impostor?", screenX + (screenW/2) - 135, screenY + 35);
+                    
+                    // Botón Skip Vote (Abajo a la izquierda)
+                    if (imgVoteSkip != null) {
+                        g2.drawImage(imgVoteSkip, screenX + 10, screenY + screenH - 35, 110, 25, null);
+                    }
+                    
+                    // Reloj (A la derecha del Skip Vote)
+                    if (tiempoRestanteReunion <= 10) g2.setColor(Color.RED);
+                    else g2.setColor(Color.DARK_GRAY);
+                    g2.setFont(new Font("Arial", Font.BOLD, 16));
+                    g2.drawString("Voting Ends In: " + tiempoRestanteReunion + "s", screenX + 130, screenY + screenH - 18);
+                    
+                    // 4. CUADRÍCULA DE JUGADORES
+                    int boxW = 280;             
+                    int boxH = 45;              
+                    int espaciadoColumnas = 20; 
+                    int espaciadoFilas = 55;    
+                    
+                    int startX = screenX + (screenW - (boxW * 2 + espaciadoColumnas)) / 2;  
+                    int startY = screenY + 70;  
+                    
+                    int col = 0;
+                    int row = 0;
+                    
+                    for (Jugador j : jugadoresConectados.values()) {
+                        int drawX = startX + (col * (boxW + espaciadoColumnas));
+                        int drawY = startY + (row * espaciadoFilas);
+                        
+                        // Color de fondo
+                        if (!j.isVivo()) g2.setColor(new Color(150, 150, 150, 180)); 
+                        else g2.setColor(Color.WHITE); 
+                        
+                        g2.fillRoundRect(drawX, drawY, boxW, boxH, 10, 10);
+                        g2.setColor(Color.GRAY);
+                        g2.drawRoundRect(drawX, drawY, boxW, boxH, 10, 10);
+                        
+                        // --- DIBUJAR AL TRIPULANTITO YA PINTADO ---
+                        if (iconosPintadosTablet.containsKey(j.getId())) {
+                            // Sacamos su foto personal pintada de la memoria
+                            java.awt.image.BufferedImage suFoto = iconosPintadosTablet.get(j.getId());
+                            g2.drawImage(suFoto, drawX + 8, drawY + 5, 45, 35, null);
+                        }
+                        
+                        // --- DIBUJAR MEGÁFONO AL QUE REPORTÓ ---
+                        if (j.getId() == idReportadorActual && imgVoteMegafono != null) {
+                            // Lo centramos mejor respecto a la caja
+                            g2.drawImage(imgVoteMegafono, drawX - 25, drawY + 10, 30, 28, null);
+                        }
+                        
+                        // Nombre
+                        g2.setColor(Color.BLACK);
+                        g2.setFont(new Font("Arial", Font.BOLD, 18));
+                        g2.drawString(j.getNombre(), drawX + 55, drawY + 28);
+                        
+                        // --- ESTADO SELECCIONADO: MOSTRAR BOTONES ---
+                        // Si hice clic en este jugador y aún no he votado oficialmente...
+                        if (idVotadoSeleccionado == j.getId() && !yaVote && j.isVivo()) {
+                            
+                            // Ponemos un recuadro verde alrededor de la caja para resaltar
+                            g2.setColor(new Color(50, 200, 50));
+                            g2.setStroke(new java.awt.BasicStroke(3));
+                            g2.drawRoundRect(drawX, drawY, boxW, boxH, 10, 10);
+                            
+                            // Dibujamos el Confirmar y Cancelar a la derecha de la caja
+                            if (imgVoteConfirmar != null) {
+                                g2.drawImage(imgVoteConfirmar, drawX + boxW - 100, drawY + 3, 40, 40, null);
+                            }
+                            if (imgVoteCancelar != null) {
+                                g2.drawImage(imgVoteCancelar, drawX + boxW - 50, drawY + 3, 40, 40, null);
+                            }
+                        }
+                        
+                        // Si ESTE jugador ya votó (sea yo o sea otro por red), dibujamos su estampilla
+                        if (j.isHaVotado() && imgVoteIVoted != null) {
+                            g2.drawImage(imgVoteIVoted, drawX - 15, drawY + 5, 35, 35, null);
+                        }
+                        
+                        // Tachado rojo
+                        if (!j.isVivo()) {
+                            g2.setColor(new Color(255, 0, 0, 150)); 
+                            g2.setStroke(new java.awt.BasicStroke(4));
+                            g2.drawLine(drawX + 10, drawY + 10, drawX + boxW - 10, drawY + boxH - 10);
+                            g2.drawLine(drawX + boxW - 10, drawY + 10, drawX + 10, drawY + boxH - 10);
+                        }
+                        
+                        col++;
+                        if (col > 1) { 
+                            col = 0; row++;
+                        }
+                    }
+                }
+            }
+            
+            // 7. ANIMACIÓN DE EXPULSIÓN (Capa Superior Máxima)
+            if (mostrandoAnimacionExpulsion) {
+                // Fondo totalmente negro
+                g2.setColor(Color.BLACK);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                
+                // Las estrellas de fondo
+                if (imgFondoEjected != null) {
+                    g2.drawImage(imgFondoEjected, 0, 0, getWidth(), getHeight(), this);
+                }
+                
+                // El personaje flotando y girando (Si alguien fue expulsado)
+                if (imgCharEjectedPintado != null) {
+                    java.awt.geom.AffineTransform old = g2.getTransform();
+                    // Movemos el eje al centro del muñeco
+                    g2.translate(expulsionX, getHeight() / 2.0);
+                    // Lo giramos
+                    g2.rotate(expulsionAngulo);
+                    // Lo dibujamos
+                    g2.drawImage(imgCharEjectedPintado, -45, -65, 90, 130, this);
+                    // Restauramos la cámara
+                    g2.setTransform(old);
+                }
+                
+                // Texto de máquina de escribir centrado
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 24));
+                String textoMostrar = textoExpulsion.substring(0, charsMostradosExpulsion);
+                g2.drawString(textoMostrar, (getWidth() / 2) - 150, (getHeight() / 2) + 120);
+            }
+            
+            // 8. ANIMACIÓN DE OSCURECIMIENTO (Fondo Negro)
+            // Lo dibujamos si se está animando o si el juego ya terminó (como fondo)
+            if (animandoFinDeJuego || juegoTerminado) {
+                java.awt.Composite originalComposite = g2.getComposite();
+                g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, opacidadFinJuego));
+                g2.setColor(Color.BLACK);
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setComposite(originalComposite);
+            }
+
+            // 9. PANTALLA DE FIN DE JUEGO (Imagen, Personajes y Texto con Fade-In)
+            if (juegoTerminado) {
+                java.awt.Composite originalComposite = g2.getComposite();
+                // Aplicamos la transparencia para que todo aparezca suavemente
+                g2.setComposite(java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, opacidadImagenFin));
+                
+                // --- CAPA 1: DIBUJAR EL FONDO (Win o Defeat) ---
+                if (victoriaLocal && imgVictoriaFondo != null) {
+                    g2.drawImage(imgVictoriaFondo, 0, 0, getWidth(), getHeight(), this);
+                } else if (!victoriaLocal && imgDerrotaFondo != null) {
+                    g2.drawImage(imgDerrotaFondo, 0, 0, getWidth(), getHeight(), this);
+                } else {
+                    g2.setColor(Color.BLACK);
+                    g2.fillRect(0, 0, getWidth(), getHeight());
+                }
+
+                // --- CAPA 2: DIBUJAR A LOS GANADORES EN EL CENTRO ---
+                int spriteW = 100; // Ancho del personaje en pantalla
+                int spriteH = 120; // Alto
+                int separacion = 30; // Espacio entre cada jugador
+                
+                int totalW = (spritesGanadores.size() * spriteW) + ((spritesGanadores.size() - 1) * separacion);
+                int startX = (getWidth() - totalW) / 2;
+                int startY = (getHeight() - spriteH) / 2; // Centro vertical
+
+                for (int i = 0; i < spritesGanadores.size(); i++) {
+                    int drawX = startX + (i * (spriteW + separacion));
+                    
+                    // Dibujamos el personaje
+                    g2.drawImage(spritesGanadores.get(i), drawX, startY, spriteW, spriteH, null);
+                    
+                    // Dibujamos su nombre arriba de la cabeza
+                    g2.setColor(Color.WHITE);
+                    g2.setFont(new Font("Arial", Font.BOLD, 18));
+                    String nom = nombresGanadores.get(i);
+                    int nomW = g2.getFontMetrics().stringWidth(nom);
+                    g2.drawString(nom, drawX + (spriteW - nomW) / 2, startY - 15);
+                }
+                
+                // --- CAPA 3: DIBUJAR EL TEXTO DE QUIÉN GANÓ ---
+                if (textoGanadores.contains("IMPOSTORES")) g2.setColor(new Color(255, 50, 50)); // Rojo
+                else g2.setColor(new Color(100, 200, 255)); // Celeste
+                
+                g2.setFont(new Font("Arial", Font.BOLD, 36));
+                int anchoTexto = g2.getFontMetrics().stringWidth(textoGanadores);
+                g2.drawString(textoGanadores, (getWidth() - anchoTexto) / 2, getHeight() - 80); 
+                
+                // --- RESTAURAR EL PINCEL ORIGINAL ---
+                g2.setComposite(originalComposite);
+            }
+            
+            // --- 10. DIBUJAR BARRA DE TAREAS ---
+            int barraX = 20;
+            int barraY = 20;
+            int barraAnchoTotal = 300;
+            int barraAlto = 25;
+            
+            // Fondo gris
+            g2.setColor(new Color(50, 50, 50, 200));
+            g2.fillRect(barraX, barraY, barraAnchoTotal, barraAlto);
+            
+            // Relleno verde usando el Gestor
+            int rellenoVerde = (int)(barraAnchoTotal * gestorTareas.obtenerPorcentajeProgreso());
+            g2.setColor(new Color(50, 255, 50)); 
+            g2.fillRect(barraX, barraY, rellenoVerde, barraAlto);
+            
+            // Borde blanco
+            g2.setColor(Color.WHITE);
+            g2.setStroke(new java.awt.BasicStroke(3));
+            g2.drawRect(barraX, barraY, barraAnchoTotal, barraAlto);
+            
             // --- PANTALLA DE LOBBY ---
             if (!juegoIniciado) {
                 // Fondo oscuro transparente
@@ -755,8 +1348,8 @@ while (!todosLosPixelesRojos.isEmpty()) {
    @Override
     public void actionPerformed(ActionEvent e) {
         // VALIDACIÓN DE SEGURIDAD
-        // Si el juego no ha iniciado, abortamos el movimiento y salimos del método
-        if (!juegoIniciado) {
+        // Si el juego no ha iniciado, ya terminó, o se está oscureciendo la pantalla... ¡NADIE SE MUEVE!
+        if (!juegoIniciado || juegoTerminado || animandoFinDeJuego) {
             return; 
         }
         
@@ -770,8 +1363,8 @@ while (!todosLosPixelesRojos.isEmpty()) {
         // IMPORTANTE: Si no ponemos velocidad, se moverá a 1 píxel por hora.
         double velocidad = 4.0; 
         
-        // Si hay animación de reporte o estoy muerto, no me muevo
-        if (mostrandoAnimacionReporte || (modoEspectador && !miMuñeco.isVivo())) {
+        // Si hay animación, ESTÁ LA TABLET ABIERTA, o estoy muerto, no me muevo
+        if (mostrandoAnimacionReporte || mostrandoTabletReunion || (modoEspectador && !miMuñeco.isVivo())) {
             velocidad = 0;
         }
 
@@ -833,6 +1426,14 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 clienteRed.enviar(mensaje);
                 estabaMoviendose = true; 
             }
+            
+            contadorPasos++;
+    if (contadorPasos >= 20) { // Suena un paso cada 300ms aprox
+        // Aquí podrías detectar el color del suelo para elegir carpeta, 
+        // por ahora usemos Tile como base:
+        GestorSonido.jugar("Footsteps/Tile/FootstepTile.wav");
+        contadorPasos = 0;
+    }
         } else {
             // B) SI NO TOCO TECLAS:
             miMuñeco.setMoviendose(false);
@@ -932,7 +1533,6 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 if (this.miJugador.getEsImpostor()) {
                     botonVent.setEnabled(true);
                     
-                    // IMPORTANTE: Encontrar la vent consolidada más cercana a pieX, pieY
                     double distMin = Double.MAX_VALUE;
                     for (int i = 0; i < listaVents.size(); i++) {
                         double d = listaVents.get(i).distance(pieX, pieY);
@@ -945,12 +1545,22 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 botonUse.setEnabled(false);
             } 
             else if (tocandoVerde) {
-                if (!this.miJugador.getEsImpostor()) botonUse.setEnabled(true);
+                if (!this.miJugador.getEsImpostor()) {
+                    // Preguntamos al Gestor si hay una tarea AQUÍ que NO esté completada
+                    tareaActualEnZona = gestorTareas.obtenerTareaEnZona(pieX, pieY);
+                    
+                    if (tareaActualEnZona != null) {
+                        botonUse.setEnabled(true); // ¡Se ilumina!
+                    } else {
+                        botonUse.setEnabled(false); // Se pone transparente (ya la hicimos)
+                    }
+                }
                 botonVent.setEnabled(false);
             } 
             else {
                 botonVent.setEnabled(false);
-                botonUse.setEnabled(false);
+                botonUse.setEnabled(false); // Lejos de cualquier zona, siempre transparente
+                tareaActualEnZona = null; 
             }
         }
         
@@ -1009,20 +1619,7 @@ while (!todosLosPixelesRojos.isEmpty()) {
         
         if (tecla == KeyEvent.VK_SPACE) miJugador.setVivo(!miJugador.isVivo());
         
-        if (tecla == KeyEvent.VK_C) {
-            // Generamos color random
-            int r = (int)(Math.random()*255);
-            int g = (int)(Math.random()*255);
-            int b = (int)(Math.random()*255);
-            
-            // 1. Enviamos al servidor: "COLOR,MiID,R,G,B"
-            clienteRed.enviar("COLOR," + miId + "," + r + "," + g + "," + b);
-            
-            // 2. (Opcional) Lo cambiamos localmente de una vez para que sea instantáneo
-            actualizarColorJugador(miId, r, g, b);
-                repaint();
         
-        }
         
     }
 
@@ -1039,34 +1636,6 @@ while (!todosLosPixelesRojos.isEmpty()) {
     @Override public void keyTyped(KeyEvent e) {}
     
     
-    public void realizarMisionAutomatica() {
-        if (idMisionCercana != -1 && !misMisionesCompletadas[idMisionCercana]) {
-            // 1. La marcamos como hecha en nuestra lista personal
-            misMisionesCompletadas[idMisionCercana] = true;
-            
-            // 2. Apagamos el botón para no repetirla
-            botonUsar.setEnabled(false);
-            botonUsar.setBackground(Color.LIGHT_GRAY);
-            
-            System.out.println("✅ ¡Misión " + idMisionCercana + " completada!");
-            
-            // 3. ¡Le avisamos a todo el mundo por internet que suba la barra!
-            clienteRed.enviar("TASK_DONE"); 
-        }
-    }
-    
-    public void registrarMisionGlobal() {
-        misionesCompletadasGlobales++;
-        
-        // Calculamos el porcentaje
-        int porcentaje = (int) (((double) misionesCompletadasGlobales / totalMisionesGlobales) * 100);
-        barraMisiones.setValue(porcentaje);
-        
-        if (porcentaje >= 100) {
-            System.out.println("🎉 ¡VICTORIA DE LOS TRIPULANTES! (Todas las misiones hechas)");
-            // Aquí luego pondremos la pantalla de victoria
-        }
-    }
     
     
    // Sincronizar estado de jugadores remotos basado en datos del servidor
@@ -1187,6 +1756,7 @@ while (!todosLosPixelesRojos.isEmpty()) {
             botonReport.setVisible(false);
         }
         repaint();
+        verificarFinDeJuego();
     }
         
     
@@ -1194,6 +1764,8 @@ while (!todosLosPixelesRojos.isEmpty()) {
     if (jugadoresConectados.containsKey(id)) {
         jugadoresConectados.remove(id);
         repaint(); // Redibujar para que desaparezca
+        
+        verificarFinDeJuego();
     }
 }
     
@@ -1217,22 +1789,6 @@ public void focusLost(FocusEvent e) {
         clienteRed.enviar(mensaje);
     }
     repaint();
-}
-
-// CORRECCIÓN EN teletransportar
-private void teletransportar() {
-    if (!jugadoresConectados.containsKey(miId)) return;
-    int siguienteVent = (idVentCercana + 1) % listaVents.size();
-    int nuevaX = listaVents.get(siguienteVent).x - 25; // Centrar muñeco
-    int nuevaY = listaVents.get(siguienteVent).y - 55;
-    
-    Jugador yo = jugadoresConectados.get(miId);
-    yo.setX(nuevaX);
-    yo.setY(nuevaY);
-    
-    // Agregamos las partes faltantes para evitar que el servidor crashée
-    String mensaje = "MOV," + miId + "," + nuevaX + "," + nuevaY + "," + yo.isMirandoDerecha() + ",false";
-    clienteRed.enviar(mensaje);
 }
     // Método que llama ClienteRed cuando llega un aviso de color
     public void actualizarColorJugador(int id, int r, int g, int b) {
@@ -1265,6 +1821,10 @@ private void teletransportar() {
     }
     public void iniciarReunion(int idReportador) {
         System.out.println("🚨 ANIMACIÓN DE REPORTE INICIADA 🚨");
+        GestorSonido.jugar("general_sounds/report_Bobbyfound.wav");
+        
+        // GUARDAMOS QUIÉN FUE EL HÉROE (O el impostor fingiendo)
+        this.idReportadorActual = idReportador;
         
         // 1. ACTIVAR ANIMACIÓN VISUAL
         mostrandoAnimacionReporte = true;
@@ -1295,21 +1855,25 @@ private void teletransportar() {
                     }
                 }
                 
-                // 3. Teletransportar A LA MESA (Solo si estoy vivo)
+                // 3. Teletransportar A LA ZONA CELESTE (Mesa de Reunión)
                 if (jugadoresConectados.containsKey(miId)) {
                     Jugador yo = jugadoresConectados.get(miId);
                     
                     if (yo.isVivo()) {
-                        // Coordenadas mesa
-                        int randomX = 350 + (int)(Math.random() * 60); 
-                        int randomY = 250 + (int)(Math.random() * 40);
+                        // Usamos las coordenadas del spawn (zona celeste) detectadas en cargarMapa
+                        // Le sumamos un offset aleatorio (entre -40 y 40) para esparcirlos alrededor de la mesa
+                        int offsetX = (int)(Math.random() * 80) - 40;
+                        int offsetY = (int)(Math.random() * 80) - 40;
                         
-                        yo.setX(randomX);
-                        yo.setY(randomY);
+                        int nuevaX = spawnX + offsetX; 
+                        int nuevaY = spawnY + offsetY;
+                        
+                        yo.setX(nuevaX);
+                        yo.setY(nuevaY);
                         yo.detener();
                         
-                        // Avisar al servidor
-                        clienteRed.enviar("MOV," + miId + "," + randomX + "," + randomY);
+                        // Avisar al servidor de nuestra nueva posición
+                        clienteRed.enviar("MOV," + miId + "," + nuevaX + "," + nuevaY + "," + yo.isMirandoDerecha() + ",false");
                     }
                 }
                 
@@ -1321,11 +1885,191 @@ private void teletransportar() {
                 
                 // DETENER EL TIMER (Para que no se repita infinitamente)
                 ((Timer)e.getSource()).stop(); 
+                
+                botonAbrirChat.setVisible(true);
             }
         });
         
         timerAnimacion.setRepeats(false); // Aseguramos que solo suene una vez
         timerAnimacion.start(); // ¡CORRE TIEMPO!
+        abrirTabletReunion();
+        
+    }
+    
+    public void abrirTabletReunion() {
+        mostrandoTabletReunion = true;
+        tiempoRestanteReunion = 60; // 120 segundos
+        yaVote = false;
+        idVotadoSeleccionado = -1;
+        
+        // Limpiamos el estado de votación de TODOS los jugadores
+        for (Jugador j : jugadoresConectados.values()) {
+            j.setHaVotado(false);
+        }
+        
+        // Bloquear movimiento
+        arriba = abajo = izquierda = derecha = false;
+        
+        // Apagar botones de acción
+        botonKill.setVisible(false);
+        botonVent.setVisible(false);
+        botonReport.setVisible(false);
+        botonUse.setVisible(false);
+        
+        // Iniciar el reloj
+        if (timerReunion != null && timerReunion.isRunning()) timerReunion.stop();
+        
+        timerReunion = new Timer(1000, e -> { 
+            tiempoRestanteReunion--;
+            if (tiempoRestanteReunion <= 0) cerrarTabletReunion(); 
+            repaint();
+        });
+        timerReunion.start();
+        
+        // --- NUEVO: PINTAR LOS ICONOS DE TODOS ---
+        iconosPintadosTablet.clear(); // Limpiamos las fotos de la reunión anterior
+        for (Jugador j : jugadoresConectados.values()) {
+            if (imgVoteTripulante != null && j.getColor() != null) {
+                // Usamos tu super herramienta de color para pintar la cabecita
+                java.awt.image.BufferedImage iconoColor = starina_among_us.modelo.HerramientasColor.crearPersonaje(imgVoteTripulante, j.getColor());
+                iconosPintadosTablet.put(j.getId(), iconoColor); // Lo guardamos en el caché
+            }
+        }
+        
+        
+        areaChat.setText(""); // Limpiamos el chat de la reunión anterior
+        
+        repaint();
+    }
+    
+    public void cerrarTabletReunion() {
+        mostrandoTabletReunion = false;
+        if (timerReunion != null) timerReunion.stop();
+        
+        // --- 1. CONTEO DE VOTOS ---
+        java.util.HashMap<Integer, Integer> conteo = new java.util.HashMap<>();
+        for (Integer voto : registroVotos.values()) {
+            conteo.put(voto, conteo.getOrDefault(voto, 0) + 1);
+        }
+        
+        int idMasVotado = -1;
+        int maxVotos = 0;
+        boolean empate = false;
+        
+        botonAbrirChat.setVisible(false);
+        scrollChat.setVisible(false);
+        campoChat.setVisible(false);
+        chatAbierto = false;
+        
+        for (java.util.Map.Entry<Integer, Integer> entry : conteo.entrySet()) {
+            if (entry.getValue() > maxVotos) {
+                maxVotos = entry.getValue();
+                idMasVotado = entry.getKey();
+                empate = false;
+            } else if (entry.getValue() == maxVotos) {
+                empate = true;
+            }
+        }
+        
+        // --- 2. DECIDIR QUÉ PASA ---
+        if (empate || idMasVotado == -2 || idMasVotado == -1) {
+            iniciarAnimacionExpulsion(-1); // Empate o Skip
+        } else {
+            iniciarAnimacionExpulsion(idMasVotado); // Alguien fue expulsado
+        }
+    }
+
+    public void iniciarAnimacionExpulsion(int idExpulsado) {
+        this.idExpulsadoActual = idExpulsado;
+        mostrandoAnimacionExpulsion = true;
+        expulsionX = -100; // Empieza fuera de la pantalla por la izquierda
+        expulsionAngulo = 0;
+        charsMostradosExpulsion = 0;
+        
+        if (idExpulsado >= 0 && jugadoresConectados.containsKey(idExpulsado)) {
+            Jugador j = jugadoresConectados.get(idExpulsado);
+            textoExpulsion = j.getNombre() + " fue expulsado.";
+            // Pintamos el muñequito de expulsión con su color
+            // NUEVO: Escudo protector contra NullPointerException
+            if (imgCharEjectedOriginal != null) {
+                imgCharEjectedPintado = starina_among_us.modelo.HerramientasColor.crearPersonaje(imgCharEjectedOriginal, j.getColor());
+            } else {
+                System.out.println("⚠️ AVISO: imgCharEjectedOriginal es nulo. Se mostrará una expulsión invisible.");
+                imgCharEjectedPintado = null;
+            }
+            
+            
+        } else {
+            textoExpulsion = "Nadie fue expulsado. (Empate / Skipped)";
+            imgCharEjectedPintado = null; // No hay muñequito flotando
+        }
+
+        // Timer de la animación (Se mueve a 30 FPS)
+        timerExpulsion = new Timer(30, e -> {
+            expulsionX += 4.5; // Velocidad de flotación hacia la derecha
+            expulsionAngulo += 0.05; // Velocidad de giro
+            
+            // Efecto de máquina de escribir (1 letra nueva cada 3 frames)
+            if (charsMostradosExpulsion < textoExpulsion.length() && (int)expulsionX % 3 == 0) {
+                charsMostradosExpulsion++;
+            }
+            
+            // Cuando ya cruzó toda la pantalla, terminamos
+            if (expulsionX > getWidth() + 200) {
+                ((Timer)e.getSource()).stop();
+                finalizarExpulsion();
+            }
+            repaint();
+        });
+        timerExpulsion.start();
+    }
+    
+    public void finalizarExpulsion() {
+        mostrandoAnimacionExpulsion = false;
+        registroVotos.clear(); 
+        
+        // --- EJECUTAR LA EXPULSIÓN OFICIALMENTE AQUÍ ---
+        if (idExpulsadoActual != -1) {
+            
+            // Si soy el Host, ahora sí les digo a todos por red que lo maten
+            if (soyHost) {
+                clienteRed.enviar("MATAR," + idExpulsadoActual);
+            }
+            
+            // Lo matamos localmente y forzamos a que desaparezca (sin dejar cadáver)
+            if (jugadoresConectados.containsKey(idExpulsadoActual)) {
+                Jugador j = jugadoresConectados.get(idExpulsadoActual);
+                j.setVivo(false);
+                j.setCuerpoReportado(true); // Se vuelve invisible en el mapa
+                j.detener();
+            }
+            
+            // Si YO fui el expulsado, me convierto en espectador inmediatamente
+            if (idExpulsadoActual == miId) {
+                System.out.println("🌌 FUI EXPULSADO AL ESPACIO. MODO ESPECTADOR ON.");
+                modoEspectador = true;
+                idEspectando = -1; // Reset para buscar a alguien a quien espectear
+                cambiarObjetivoEspectador(true); // Me ancla a un jugador vivo
+                
+                // Apago todos mis controles
+                botonKill.setVisible(false);
+                botonVent.setVisible(false);
+                botonReport.setVisible(false);
+                botonUse.setVisible(false);
+            }
+        }
+        
+        // Devolvemos los botones al jugador si sigue vivo
+        Jugador yo = jugadoresConectados.get(miId);
+        if (yo != null && yo.isVivo()) {
+            if (yo.esImpostor()) {
+                botonKill.setVisible(true);
+                botonVent.setVisible(true);
+            }
+        }
+        repaint();
+        
+        verificarFinDeJuego();
     }
     
     private void cambiarObjetivoEspectador(boolean avanzar) {
@@ -1379,5 +2123,186 @@ public void agregarJugador(int id, String nombre, int x, int y, int r, int g, in
     jugadoresConectados.put(id, nuevo);
     repaint();
 }
+
+    public void verificarFinDeJuego() {
+        // Si ya terminó, no ha iniciado o ya estamos en la animación de fin, ignorar
+        if (juegoTerminado || !juegoIniciado || animandoFinDeJuego) return;
+
+        int vivosTripulantes = 0;
+        int vivosImpostores = 0;
+
+        // Contamos quién queda en pie
+        for (Jugador j : jugadoresConectados.values()) {
+            if (j.isVivo()) {
+                if (j.getEsImpostor()) vivosImpostores++;
+                else vivosTripulantes++;
+            }
+        }
+
+        // SEGURO ANTI-BUGS: Si no queda absolutamente nadie vivo, ignoramos
+        if (vivosTripulantes + vivosImpostores == 0) return;
+
+        // --- NUEVAS REGLAS DE VICTORIA ---
+        boolean gananImpostores = (vivosImpostores >= vivosTripulantes);
+        // Victoria si no quedan impostores O si la barra de tareas está llena (100%)
+        boolean gananTripulantesPorTareas = (gestorTareas.obtenerPorcentajeProgreso() >= 1.0f);
+        boolean gananTripulantesPorExpulsion = (vivosImpostores == 0);
+        
+        boolean gananTripulantes = gananTripulantesPorExpulsion || gananTripulantesPorTareas;
+
+        if (gananImpostores || gananTripulantes) {
+            
+            // 1. Decidir victoria local EXACTA y preparar el texto
+            Jugador yo = jugadoresConectados.get(miId);
+            if (yo != null) {
+                if (yo.getEsImpostor() && gananImpostores) victoriaLocal = true;
+                else if (!yo.getEsImpostor() && gananTripulantes) victoriaLocal = true;
+                else victoriaLocal = false;
+            }
+            
+            if (gananImpostores) textoGanadores = "Ganan los: IMPOSTORES";
+            else textoGanadores = gananTripulantesPorTareas ? "¡TAREAS COMPLETADAS! Ganan Tripulantes" : "Ganan los: TRIPULANTES";
+            
+            // 2. Apagamos TODOS los controles para que ya nadie juegue
+            arriba = abajo = izquierda = derecha = false;
+            botonKill.setVisible(false);
+            botonVent.setVisible(false);
+            botonReport.setVisible(false);
+            botonUse.setVisible(false);
+            
+            // --- NUEVO: PINTAR A LOS GANADORES ---
+            spritesGanadores.clear();
+            nombresGanadores.clear();
+            
+            for (Jugador j : jugadoresConectados.values()) {
+                // Si ganaron los impostores y él es impostor, O si ganaron tripulantes y NO es impostor
+                if ((gananImpostores && j.getEsImpostor()) || (gananTripulantes && !j.getEsImpostor())) {
+                    if (imgBaseGanador != null && j.getColor() != null) {
+                        java.awt.image.BufferedImage spritePintado = starina_among_us.modelo.HerramientasColor.crearPersonaje(imgBaseGanador, j.getColor());
+                        spritesGanadores.add(spritePintado);
+                        nombresGanadores.add(j.getNombre());
+                    }
+                }
+            }
+            
+            // 3. ¡INICIAR LA TRANSICIÓN DE 2 FASES!
+            animandoFinDeJuego = true;
+            juegoTerminado = false; // Falso hasta que la pantalla esté negra
+            opacidadFinJuego = 0.0f;
+            opacidadImagenFin = 0.0f;
+            
+            timerFinDeJuego = new Timer(30, e -> {
+                
+                if (!juegoTerminado) {
+                    // FASE 1: Oscurecer el mapa
+                    opacidadFinJuego += 0.015f; 
+                    if (opacidadFinJuego >= 1.0f) {
+                        opacidadFinJuego = 1.0f;
+                        juegoTerminado = true; // Activa la Fase 2
+                    }
+                } else {
+                    // FASE 2: Aparecer la imagen y el texto (Fade In)
+                    opacidadImagenFin += 0.02f;
+                    if (opacidadImagenFin >= 1.0f) {
+                        opacidadImagenFin = 1.0f;
+                        animandoFinDeJuego = false; // Terminó toda la animación
+                        
+                        // --- NUEVO: MOSTRAR EL BOTÓN QUIT ---
+                        botonQuit.setVisible(true); 
+                        
+                        ((Timer)e.getSource()).stop();
+                    }
+                }
+                repaint();
+            });
+            timerFinDeJuego.start();
+        }
+    }
+    
+    
+    // Método para enviar MI mensaje
+    public void enviarMensajeChat() {
+        String texto = campoChat.getText().trim();
+        
+        if (!texto.isEmpty() && miJugador != null && miJugador.isVivo()) {
+            
+            // --- NUEVO: Limpiamos el nombre para quitar cualquier etiqueta delatora ---
+            String nombreLimpio = miJugador.getNombre().replace(" (IMPOSTOR)", "").replace("(IMPOSTOR)", "").trim();
+            
+            // Me muestro mi propio mensaje usando el nombre limpio
+            recibirMensajeChat(nombreLimpio, texto);
+            
+            // Lo enviamos por la red a los demás con el nombre limpio
+            clienteRed.enviar("CHAT," + nombreLimpio + "," + texto);
+            campoChat.setText(""); // Limpiamos la cajita
+        }
+    }
+
+    // Método que llama la red cuando alguien más (o yo) manda un mensaje
+    public void recibirMensajeChat(String emisor, String mensaje) {
+        areaChat.append(emisor + ": " + mensaje + "\n");
+        // Mover el scroll automáticamente hacia abajo
+        areaChat.setCaretPosition(areaChat.getDocument().getLength());
+    }
+    
+    
+    public void aplicarColorRave(int idJugador, Color colorNuevo) {
+        Jugador j = jugadoresConectados.get(idJugador);
+        if (j != null) {
+            j.setColorTemporal(colorNuevo);
+            // Si el jugador no se repinta solo, fuerza la creación de las imágenes aquí.
+            // (Si usas HerramientasColor, puedes volver a pasar los sprites originales por esa clase aquí)
+            repaint();
+        }
+    }
+    
+    // --- TAREA 2: OFICINA DEL PROFESOR ---
+public void completarMisionOficina() {
+    if (tareaActualEnZona != null && tareaActualEnZona.getId().equals("OFI_TRABAJO")) {
+        boolean esNueva = gestorTareas.registrarTareaCompletada("OFI_TRABAJO");
+        
+        if (esNueva) {
+            clienteRed.enviar("TAREA_LISTA,OFI_TRABAJO");
+            GestorSonido.jugar("general_sounds/task_Complete.wav");
+            verificarFinDeJuego();
+        }
+        
+        botonUse.setEnabled(false); 
+        repaint(); 
+    }
+}
+    
+    // --- TAREA 3: PIZARRA DE MATEMÁTICAS ---
+public void completarMisionPizarra() {
+    if (tareaActualEnZona != null && tareaActualEnZona.getId().equals("PIZARRA_MATH")) {
+        boolean esNueva = gestorTareas.registrarTareaCompletada("PIZARRA_MATH");
+        
+        if (esNueva) {
+            clienteRed.enviar("TAREA_LISTA,PIZARRA_MATH");
+            GestorSonido.jugar("general_sounds/task_Complete.wav");
+            verificarFinDeJuego();
+        }
+        
+        botonUse.setEnabled(false); 
+        repaint(); 
+    }
+}
+    
+    public void completarMisionBiblioteca() {
+        if (tareaActualEnZona != null && tareaActualEnZona.getId().equals("BIBLIO_LIBROS")) {
+            // 1. Intentamos registrarla en el Gestor
+            boolean esNueva = gestorTareas.registrarTareaCompletada("BIBLIO_LIBROS");
+            
+            if (esNueva) {
+                // Solo si es la primera vez que se hace, avisamos a la red y verificamos victoria
+                clienteRed.enviar("TAREA_LISTA,BIBLIO_LIBROS");
+                GestorSonido.jugar("general_sounds/task_Complete.wav");
+                verificarFinDeJuego();
+            }
+            
+            botonUse.setEnabled(false); 
+            repaint(); 
+        }
+    }
     
 }

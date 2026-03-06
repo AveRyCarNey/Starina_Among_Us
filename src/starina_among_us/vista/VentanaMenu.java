@@ -6,6 +6,7 @@ package starina_among_us.vista;
 
 import javax.swing.*;
 import java.awt.*;
+import starina_among_us.modelo.GestorSonido;
 
 public class VentanaMenu extends JFrame {
 
@@ -21,6 +22,9 @@ public class VentanaMenu extends JFrame {
         setLocationRelativeTo(null);
         setResizable(false);
         setLayout(null); // Usamos null para posicionar todo libremente como en un juego
+        
+        // Si quieres que la intro suene al abrir el juego (en el menú es mejor, pero aquí sirve)
+        GestorSonido.musicaLoop("intro.wav");
 
         // Fondo oscuro
         getContentPane().setBackground(new Color(30, 30, 40));
@@ -67,7 +71,13 @@ public class VentanaMenu extends JFrame {
         btnHost.setBackground(new Color(50, 150, 50));
         btnHost.setForeground(Color.WHITE);
         btnHost.setFocusPainted(false);
-        btnHost.addActionListener(e -> iniciarJuego(true));
+        btnHost.addActionListener(e -> {iniciarJuego(true);
+            System.out.println("DEBUG: Clic en el boton Entrar"); // Agrega esto para probar el boton
+        
+        // Llama a la funcion usando la ruta completa para evitar confusiones
+        starina_among_us.modelo.GestorSonido.detenerMusica();
+        
+        });
         add(btnHost);
 
         JButton btnJoin = new JButton("UNIRSE (Join)");
@@ -75,7 +85,13 @@ public class VentanaMenu extends JFrame {
         btnJoin.setBackground(new Color(50, 100, 200));
         btnJoin.setForeground(Color.WHITE);
         btnJoin.setFocusPainted(false);
-        btnJoin.addActionListener(e -> iniciarJuego(false));
+        btnJoin.addActionListener(e -> {iniciarJuego(false);
+            System.out.println("DEBUG: Clic en el boton Entrar"); // Agrega esto para probar el boton
+        
+        // Llama a la funcion usando la ruta completa para evitar confusiones
+        starina_among_us.modelo.GestorSonido.detenerMusica();
+        
+        });
         add(btnJoin);
     }
 
@@ -122,6 +138,7 @@ public class VentanaMenu extends JFrame {
         VentanaJuego juego = new VentanaJuego(mapa, ip, nombre, colorFondo, esHost);
         juego.setVisible(true);
         
+        starina_among_us.modelo.GestorSonido.detenerMusica();
         this.dispose(); // Cerramos el menú
         
     }

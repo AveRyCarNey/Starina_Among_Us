@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<preguntas>
+    <pregunta>
+        <texto>¿Cuál es la derivada de x^2?</texto>
+        <correcta>2x</correcta>
+        <falsa1>x^3</falsa1>
+        <falsa2>2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Cuánto es 54 / 6?</texto>
+        <correcta>9</correcta>
+        <falsa1>7</falsa1>
+        <falsa2>8</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Gráfica de f(x) = x^2?</texto>
+        <correcta>Parábola</correcta>
+        <falsa1>Línea recta</falsa1>
+        <falsa2>Onda</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Integral de cos(x)?</texto>
+        <correcta>sin(x)</correcta>
+        <falsa1>-sin(x)</falsa1>
+        <falsa2>tan(x)</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Raíz cuadrada de 144?</texto>
+        <correcta>12</correcta>
+        <falsa1>14</falsa1>
+        <falsa2>16</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Qué es un triángulo isósceles?</texto>
+        <correcta>2 lados iguales</correcta>
+        <falsa1>3 lados iguales</falsa1>
+        <falsa2>Cero lados iguales</falsa2>
+    </pregunta>
+
+    <pregunta>
+        <texto>¿Resultado de 2 + 2 * 4?</texto>
+        <correcta>10</correcta>
+        <falsa1>16</falsa1>
+        <falsa2>8</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Fórmula del área de un círculo?</texto>
+        <correcta>π * r^2</correcta>
+        <falsa1>2 * π * r</falsa1>
+        <falsa2>π * d</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Solución de 3x - 6 = 0?</texto>
+        <correcta>x = 2</correcta>
+        <falsa1>x = -2</falsa1>
+        <falsa2>x = 3</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Valor del seno de 90 grados?</texto>
+        <correcta>1</correcta>
+        <falsa1>0</falsa1>
+        <falsa2>-1</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Qué es un número primo?</texto>
+        <correcta>Divisible por 1 y sí mismo</correcta>
+        <falsa1>Cualquier número impar</falsa1>
+        <falsa2>Divisible por 2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Logaritmo base 10 de 100?</texto>
+        <correcta>2</correcta>
+        <falsa1>10</falsa1>
+        <falsa2>1</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Fórmula del Teorema de Pitágoras?</texto>
+        <correcta>a^2 + b^2 = c^2</correcta>
+        <falsa1>a + b = c</falsa1>
+        <falsa2>a^2 - b^2 = c^2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Cuánto es 7 * 8?</texto>
+        <correcta>56</correcta>
+        <falsa1>48</falsa1>
+        <falsa2>64</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>¿Valor aproximado de PI (π)?</texto>
+        <correcta>3.1416</correcta>
+        <falsa1>3.1614</falsa1>
+        <falsa2>3.1415</falsa2>
+    </pregunta>
+</preguntas>

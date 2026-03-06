@@ -10,7 +10,7 @@ import starina_among_us.vista.VentanaMenu;
  * @author AveRy
  */
 public class Starina_Among_US {
-
+    
     /**
      * @param args the command line arguments
      */
