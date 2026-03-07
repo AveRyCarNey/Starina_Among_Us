@@ -6,7 +6,11 @@ import java.awt.Font;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Image;
+import java.awt.Paint;
 import java.awt.Point;
+import java.awt.Rectangle;
+import java.awt.RenderingHints;
+import java.awt.Stroke;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -23,7 +27,8 @@ import starina_among_us.red.ClienteRed;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.HashMap;
-import javax.swing.JProgressBar;
+import javax.swing.SwingConstants;
+import starina_among_us.modelo.GestorConfiguracion;
 import starina_among_us.modelo.GestorSonido;
 
 public class PanelJuego extends JPanel implements KeyListener, ActionListener, FocusListener {
@@ -87,7 +92,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     private boolean juegoIniciado = false;
     private boolean soyHost = false;
     private JButton botonIniciarPartida;
-    private final int MIN_JUGADORES = 5; 
+    private final int MIN_JUGADORES = 2; 
     
     
     private JButton botonUse;
@@ -158,10 +163,46 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     private float opacidadImagenFin = 0.0f;
     private String textoGanadores = "";
     
+    
+    // --- VARIABLES MISIÓN SERVIDOR (SALONES) ---
+    private Timer timerMisionServidor;
+    private int tiempoMisionServidor = 0;
+    private boolean misionServidorActiva = false;
+    // La zona segura: Un cuadro más grande alrededor del servidor (ajusta estos números a tu gusto)
+    private Rectangle zonaSeguraServidor = new Rectangle(560, 400, 130, 100);
+    
+    // --- VARIABLES MISIÓN PC (SALONES) ---
+    private Timer timerMisionPC;
+    private int tiempoMisionPC = 0;
+    private boolean misionPCActiva = false;
+    // La zona segura: Alrededor de (1300, 850)
+    private Rectangle zonaSeguraPC = new Rectangle(1395, 824, 69, 176);
+    
+    
     // --- VARIABLES DE LOS GANADORES EN PANTALLA ---
     private java.awt.image.BufferedImage imgBaseGanador;
     private java.util.ArrayList<java.awt.image.BufferedImage> spritesGanadores = new java.util.ArrayList<>();
     private java.util.ArrayList<String> nombresGanadores = new java.util.ArrayList<>();
+    
+    
+    // --- VARIABLES DEL BOTÓN DE EMERGENCIA ---
+    private java.awt.image.BufferedImage imgBotonEmergencia;
+    private java.awt.Rectangle zonaEmergencia;
+    private int botonEmergenciaX;
+    private int botonEmergenciaY;
+    private boolean cercaBotonEmergencia = false;
+    
+    // --- VARIABLES ANIMACIÓN EMERGENCIA ---
+    private boolean esEmergenciaActual = false; 
+    private java.awt.image.BufferedImage imgEmergenciaFondo;
+    private java.awt.image.BufferedImage imgEmergenciaTexto;
+    private java.awt.image.BufferedImage imgEmergenciaCuerpo;
+    private java.awt.image.BufferedImage imgEmergenciaMano;
+    private java.awt.image.BufferedImage imgEmergenciaMesa;
+    
+    // Guardaremos las versiones pintadas temporalmente
+    private java.awt.image.BufferedImage imgEmergenciaCuerpoPintado;
+    private java.awt.image.BufferedImage imgEmergenciaManoPintada;
     
     private JButton botonQuit;
     
@@ -172,6 +213,22 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
     public starina_among_us.modelo.GestorTareas getGestorTareas() { return gestorTareas; }
     
     private int contadorPasos = 0;
+    
+    
+    // --- VARIABLES DE VISIÓN Y SABOTAJE ---
+    private boolean visionSaboteada = false;
+    private int tiempoSaboteo = 0; 
+    private Timer timerEfectoSaboteo;
+
+    private int cooldownSabotage = 10; // Inicia en 10s al empezar o tras una reunión
+    private Timer timerCooldownSabotage;
+
+    private JButton botonSabotage;
+    
+    
+    // --- VARIABLES DE COOLDOWN KILL ---
+    private int cooldownKill = 10; 
+    private Timer timerCooldownKill;
     
     
 
@@ -190,6 +247,7 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         
         // Cargar el mapa
         cargarMapa(mapaElegido);
+        gestorTareas.cargarMisionesPorMapa(mapaElegido);
         
         // Inicializar la base de datos de jugadores vacía
         jugadoresConectados = new ConcurrentHashMap<>();
@@ -232,10 +290,31 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         botonUse.setEnabled(false); // Apagado por defecto
         
         botonUse.addActionListener(e -> {
-            if (tareaActualEnZona == null) return; // Seguridad extra
             
+            
+            // --- PRIORIDAD MÁXIMA: BOTÓN DE EMERGENCIA ---
+            if (cercaBotonEmergencia) {
+                System.out.println("🚨 ¡EMERGENCIA SOLICITADA LOCALMENTE!");
+                
+                // 1. Avisar a los demás por red (El servidor NO te lo devolverá a ti)
+                clienteRed.enviar("EMERGENCIA_RED," + miId);
+                
+                // 2. OBLIGATORIO: Ejecutar la reunión para mí mismo en este instante
+                try {
+                    iniciarReunion(miId, true); 
+                } catch (Exception ex) {
+                    System.out.println("❌ ERROR INICIANDO REUNIÓN LOCAL: " + ex.getMessage());
+                }
+                
+                botonUse.setEnabled(false);
+                PanelJuego.this.requestFocusInWindow(); // Devolver el control al juego
+                return; // 🛑 Cortamos aquí para que no busque misiones
+            }
+            
+            
+            if (tareaActualEnZona == null) return; // Seguridad extra
             // --- TAREA 1: EL LABORATORIO ---
-            if (tareaActualEnZona.getId().equals("LAB_FRASCOS")) {
+            else if (tareaActualEnZona.getId().equals("LAB_FRASCOS")) {
                 System.out.println("🧪 Bebiendo sustancia desconocida...");
                 tareaActualEnZona.setCompletada(true); 
                 botonUse.setEnabled(false); 
@@ -294,6 +373,71 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 starina_among_us.vista.VistaMisionBiblioteca minijuego = new starina_among_us.vista.VistaMisionBiblioteca(PanelJuego.this);
                 minijuego.setVisible(true); 
             }
+            
+            // --- NUEVO MAPA SALONES: TAREA 1 (SERVIDOR) ---
+            else if (tareaActualEnZona.getId().equals("SALONES_SERVIDOR")) {
+                if (!misionServidorActiva) {
+                    System.out.println("💻 Iniciando reinicio de servidor...");
+                    misionServidorActiva = true;
+                    tiempoMisionServidor = 15;
+                    botonUse.setEnabled(false);
+                    starina_among_us.modelo.GestorSonido.jugar("general_sounds/task_Inprogress.wav"); 
+                    
+                    timerMisionServidor = new Timer(1000, ev -> {
+                        tiempoMisionServidor--;
+                        
+                        if (tiempoMisionServidor <= 0) {
+                            // ¡Misión completada!
+                            ((Timer)ev.getSource()).stop();
+                            misionServidorActiva = false;
+                            
+                            boolean esNueva = gestorTareas.registrarTareaCompletada("SALONES_SERVIDOR");
+                            if (esNueva) {
+                                clienteRed.enviar("TAREA_LISTA,SALONES_SERVIDOR");
+                                starina_among_us.modelo.GestorSonido.jugar("general_sounds/task_Complete.wav");
+                                verificarFinDeJuego();
+                            }
+                        }
+                        repaint(); // Actualizar el número en pantalla
+                    });
+                    timerMisionServidor.start();
+                }
+            }
+            
+            // --- NUEVO MAPA SALONES: TAREA 2 (APAGAR PC) ---
+            else if (tareaActualEnZona.getId().equals("SALONES_PC")) {
+                if (!misionPCActiva) {
+                    System.out.println("💻 Abriendo PC...");
+                    starina_among_us.vista.VistaMisionPC minijuego = new starina_among_us.vista.VistaMisionPC(PanelJuego.this);
+                    minijuego.setVisible(true); // Se pausa aquí hasta que el jugador cierre la ventana
+                    
+                    // Al cerrarse, preguntamos si puso bien la contraseña
+                    if (minijuego.isCompletada()) {
+                        System.out.println("🔌 Contraseña correcta. Iniciando apagado de 5 segundos...");
+                        misionPCActiva = true;
+                        tiempoMisionPC = 5; // Solo 5 segundos
+                        botonUse.setEnabled(false);
+                        starina_among_us.modelo.GestorSonido.jugar("general_sounds/task_Inprogress.wav");
+                        
+                        timerMisionPC = new Timer(1000, ev -> {
+                            tiempoMisionPC--;
+                            if (tiempoMisionPC <= 0) {
+                                ((Timer)ev.getSource()).stop();
+                                misionPCActiva = false;
+                                
+                                boolean esNueva = gestorTareas.registrarTareaCompletada("SALONES_PC");
+                                if (esNueva) {
+                                    clienteRed.enviar("TAREA_LISTA,SALONES_PC");
+                                    starina_among_us.modelo.GestorSonido.jugar("general_sounds/task_Complete.wav");
+                                    verificarFinDeJuego();
+                                }
+                            }
+                            repaint();
+                        });
+                        timerMisionPC.start();
+                    }
+                }
+            }
         });
         
         botonUse.setFocusable(false);
@@ -308,6 +452,38 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         botonKill.setVisible(false);
         botonKill.setEnabled(false);
         botonKill.setFocusable(false);
+        
+        // --- ESTILO DEL TEXTO DEL BOTÓN KILL ---
+        botonKill.setFont(new Font("Arial", Font.BOLD, 24));
+        botonKill.setHorizontalTextPosition(SwingConstants.CENTER);
+        botonKill.setVerticalTextPosition(SwingConstants.CENTER);
+
+        // --- TIMER DEL COOLDOWN KILL ---
+        timerCooldownKill = new Timer(1000, e -> {
+            if (miJugador != null && miJugador.getEsImpostor()) {
+                botonKill.setVisible(true);
+                
+                if (!juegoIniciado) {
+                    botonKill.setText("<html><font color='red'>10</font></html>");
+                    botonKill.setEnabled(false);
+                    cooldownKill = 10; // Congelado en el lobby
+                } else {
+                    if (cooldownKill > 0) {
+                        cooldownKill--;
+                        botonKill.setText("<html><font color='red'>" + cooldownKill + "</font></html>");
+                        botonKill.setEnabled(false); // Apagado por cooldown
+                    } else {
+                        botonKill.setText(""); 
+                        // OJO: ¡No lo encendemos (setEnabled(true)) automáticamente aquí!
+                        // De eso se encargará el Radar si hay un tripulante cerca.
+                    }
+                }
+            } else {
+                botonKill.setVisible(false);
+                botonKill.setText(""); 
+            }
+        });
+        timerCooldownKill.start();
         
         // 2. BOTÓN VENT (Arriba del Kill)
         botonVent = new JButton();
@@ -365,6 +541,63 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
         });
         
         this.add(botonQuit);
+        
+        
+        // --- CREAR BOTÓN SABOTAJE ---
+        botonSabotage = new JButton();
+        // Lo posicionamos arriba del botón USE (ajusta las coordenadas X y Y si se enciman)
+        botonSabotage.setBounds(650, 170, 110, 112); 
+        botonSabotage.setOpaque(false);
+        botonSabotage.setContentAreaFilled(false);
+        botonSabotage.setBorderPainted(false);
+        botonSabotage.setFocusPainted(false);
+        botonSabotage.setVisible(false);
+        
+        // --- ESTILO DEL NÚMERO ---
+        botonSabotage.setFont(new Font("Arial", Font.BOLD, 24)); // ¡Más pequeño para que no tape!
+        botonSabotage.setHorizontalTextPosition(SwingConstants.CENTER);
+        botonSabotage.setVerticalTextPosition(SwingConstants.CENTER);
+        
+        botonSabotage.addActionListener(e -> {
+            if (cooldownSabotage <= 0 && miJugador != null && miJugador.getEsImpostor()) {
+                // 1. Avisar a la red (para cegar a todos los tripulantes)
+                clienteRed.enviar("SABOTAJE_VISION");
+                // 2. Activarlo para nosotros mismos
+                activarSabotajeVision();
+                botonSabotage.setEnabled(false);
+                this.requestFocusInWindow();
+            }
+        });
+        this.add(botonSabotage);
+
+        // --- TIMER QUE ACTUALIZA EL TEXTO Y EL COOLDOWN ---
+        timerCooldownSabotage = new Timer(1000, e -> {
+            if (miJugador != null && miJugador.getEsImpostor()) {
+                botonSabotage.setVisible(true); // Solo impostores lo ven
+                
+                // ¿Estamos en el lobby de espera?
+                if (!juegoIniciado) {
+                    // Congelamos el botón en 10 segundos y transparente
+                    botonSabotage.setText("<html><font color='red'>10</font></html>");
+                    botonSabotage.setEnabled(false);
+                    cooldownSabotage = 10; // Reseteado constantemente
+                } 
+                // ¿El juego ya empezó? ¡Que corra el reloj!
+                else {
+                    if (cooldownSabotage > 0) {
+                        cooldownSabotage--;
+                        botonSabotage.setText("<html><font color='red'>" + cooldownSabotage + "</font></html>");
+                        botonSabotage.setEnabled(false); 
+                    } else {
+                        botonSabotage.setText(""); // Ocultamos el número
+                        botonSabotage.setEnabled(true); // Vuelve a la normalidad
+                    }
+                }
+            } else {
+                botonSabotage.setVisible(false); // Tripulantes no lo ven
+            }
+        });
+        timerCooldownSabotage.start();
         
         
         // --- 1. ÁREA DE MENSAJES (JTextArea) ---
@@ -430,6 +663,9 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 // VENT: 1243, 2 | 120x110
                 BufferedImage imgVent = starina_among_us.modelo.HerramientasImagen.recortar(hojaBotones, 1243, 2, 120, 110);
                 
+                // SABOTAJE
+                BufferedImage imgBotonSabotage = starina_among_us.modelo.HerramientasImagen.recortar(hojaBotones, 475, 3, 110, 112);
+                
                 // REPORT: 589, 3 | 117x112
                 BufferedImage imgReport = starina_among_us.modelo.HerramientasImagen.recortar(hojaBotones, 589, 3, 117, 112);
                 
@@ -445,8 +681,9 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 BufferedImage ventGris = starina_among_us.modelo.HerramientasImagen.hacerTransparente(imgVent, 0.5f);
                 BufferedImage reportGris = starina_among_us.modelo.HerramientasImagen.hacerTransparente(imgReport, 0.5f);
                 BufferedImage useGris = starina_among_us.modelo.HerramientasImagen.hacerTransparente(imgUse, 0.5f);
+                BufferedImage sabotajeGris = starina_among_us.modelo.HerramientasImagen.hacerTransparente(imgBotonSabotage, 0.5f);
                 
-                // Asignar Iconos
+                // --- ASIGNAR ICONOS ---
                 botonKill.setIcon(new ImageIcon(imgKill));
                 botonKill.setDisabledIcon(new ImageIcon(killGris));
                 
@@ -459,10 +696,15 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 botonUse.setIcon(new ImageIcon(imgUse));
                 botonUse.setDisabledIcon(new ImageIcon(useGris));
                 
+                // NUEVO: Asignar iconos para el Botón de Sabotaje
+                botonSabotage.setIcon(new ImageIcon(imgBotonSabotage));          // Imagen normal (a color)
+                botonSabotage.setDisabledIcon(new ImageIcon(sabotajeGris));      // Imagen transparente (cooldown)
+                
             } catch (Exception e) {
                 System.out.println("Error recortando botones: " + e.getMessage());
             }
-        } else {
+        }
+         else {
             // Respaldo de Texto
             botonKill.setText("MATAR"); botonKill.setContentAreaFilled(true); botonKill.setBackground(Color.RED);
             botonVent.setText("VENT"); botonVent.setContentAreaFilled(true); botonVent.setBackground(Color.GRAY);
@@ -475,8 +717,12 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             if (idVictimaCercana != -1) {
                 GestorSonido.jugar("impostor_kill.wav");
                 clienteRed.enviar("MATAR," + idVictimaCercana);
-                botonKill.setEnabled(false);
+                
                 idVictimaCercana = -1;
+                
+                cooldownKill = 30;
+                botonKill.setEnabled(false); 
+                botonKill.setText("<html><font color='red'>30</font></html>");
                 this.requestFocusInWindow(); 
             }
         });
@@ -589,6 +835,16 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
             System.out.println("✅ Hueco de vent cargado con éxito.");
         } catch (Exception e) {
             System.out.println("❌ Error cargando el hueco de vents.png: " + e.getMessage());
+        }
+        
+        // --- CARGAR BOTÓN DE EMERGENCIA ---
+        try {
+            java.awt.image.BufferedImage imgIcons = javax.imageio.ImageIO.read(getClass().getResource("/starina_among_us/recursos/mapas/icons.png"));
+            // Recorte: X=882, Y=763, Ancho=51, Alto=46
+            imgBotonEmergencia = starina_among_us.modelo.HerramientasImagen.recortar(imgIcons, 882, 763, 51, 46);
+            System.out.println("🚨 Botón de emergencia cargado.");
+        } catch (Exception e) {
+            System.out.println("❌ Error cargando icons.png: " + e.getMessage());
         }
         
         
@@ -735,6 +991,24 @@ public class PanelJuego extends JPanel implements KeyListener, ActionListener, F
                 // 3. RECORTAR TEXTO (Dead Body) -> 1, 437 | 421 x 369
                 imgReporteTexto = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 1, 437, 420, 205);
                 
+                
+
+                // --- NUEVOS RECORTES: EMERGENCY MEETING ---
+                // 1. Fondo rojo alternativo (0, 0, 947, 434)
+                imgEmergenciaFondo = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 0, 0, 947, 434);
+                
+                // 2. Texto "Emergency Meeting" (418, 435, 373, 178)
+                imgEmergenciaTexto = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 418, 435, 373, 178);
+                
+                // 3. Tripulante base (748, 614, 121, 98)
+                imgEmergenciaCuerpo = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 748, 614, 121, 98);
+                
+                // 4. Mano base (226, 642, 56, 30)
+                imgEmergenciaMano = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 226, 642, 56, 30);
+                
+                // 5. Mesa con el botón (0, 643, 225, 81)
+                imgEmergenciaMesa = starina_among_us.modelo.HerramientasImagen.recortar(hojaEventos, 0, 643, 225, 81);
+                
                 System.out.println("✂️ Recortes realizados con éxito.");
             }
             
@@ -868,7 +1142,20 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 }
             }
         }
-        // Creamos una lista de "Falso/Verdadero" del mismo tamaño que las misiones encontradas
+        
+        
+        // --- CONFIGURAR ZONAS DE EMERGENCIA POR MAPA ---
+        if (nombreMapa.equals("Uni")) {
+            // Piso celeste Uni: 1200 a 1490 (ancho 290) | 1215 a 1400 (alto 185)
+            zonaEmergencia = new java.awt.Rectangle(1200, 1215, 290, 185);
+            botonEmergenciaX = 1332;
+            botonEmergenciaY = 1296;
+        } else if (nombreMapa.equals("Salones")) {
+            // Piso celeste Salones: 1610 a 1850 (ancho 240) | 385 a 690 (alto 305)
+            zonaEmergencia = new java.awt.Rectangle(1610, 385, 240, 305);
+            botonEmergenciaX = 1696;
+            botonEmergenciaY = 516;
+        }
         
         System.out.println("✅ Mapa cargado. Tamaño Real: " + anchoReal + "x" + altoReal);
         System.out.println("✅ Spawn corregido en: " + spawnX + "," + spawnY + " | Vents: " + listaVents.size());
@@ -918,12 +1205,21 @@ while (!todosLosPixelesRojos.isEmpty()) {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        
+        
         // Forzar el estado del botón visualmente en cada frame
         if (botonVent != null && (enVentilacion || animandoVent)) {
             botonVent.setEnabled(true);
         }
         try {
             Graphics2D g2 = (Graphics2D) g;
+            if (GestorConfiguracion.antialiasing) {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            } else {
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
+                g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_OFF);
+            }
             java.awt.geom.AffineTransform camaraOriginal = g2.getTransform();
             
             double zoom = 1.0; // Cambia esto si lo quieres más cerca (ej. 1.2)
@@ -975,6 +1271,65 @@ while (!todosLosPixelesRojos.isEmpty()) {
                     g2.drawImage(imgVentHole, v.x + offsetX, v.y + offsetY, null);
                     
                 }
+            }
+            
+            if (imgBotonEmergencia != null) {
+                g2.drawImage(imgBotonEmergencia, botonEmergenciaX, botonEmergenciaY, null);
+            }
+            
+            // --- DIBUJAR ZONA SEGURA DEL SERVIDOR (SALONES) ---
+            if (misionServidorActiva) {
+                // Fondo amarillo semitransparente
+                g2.setColor(new Color(255, 255, 0, 50)); 
+                g2.fillRect(zonaSeguraServidor.x, zonaSeguraServidor.y, zonaSeguraServidor.width, zonaSeguraServidor.height);
+                
+                // Borde amarillo punteado brillante
+                g2.setColor(Color.YELLOW);
+                Stroke oldStroke = g2.getStroke();
+                g2.setStroke(new java.awt.BasicStroke(3, java.awt.BasicStroke.CAP_BUTT, java.awt.BasicStroke.JOIN_BEVEL, 0, new float[]{10}, 0));
+                g2.drawRect(zonaSeguraServidor.x, zonaSeguraServidor.y, zonaSeguraServidor.width, zonaSeguraServidor.height);
+                g2.setStroke(oldStroke);
+                
+                Font fuenteOriginal = g2.getFont();
+                
+                // Texto flotante de progreso
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 18));
+                g2.drawString("REINICIANDO SERVIDOR...", zonaSeguraServidor.x - 10, zonaSeguraServidor.y - 30);
+                
+                // Contador rojo
+                g2.setColor(new Color(255, 50, 50));
+                g2.setFont(new Font("Arial", Font.BOLD, 28));
+                g2.drawString(tiempoMisionServidor + "s", zonaSeguraServidor.x + (zonaSeguraServidor.width/2) - 15, zonaSeguraServidor.y - 5);
+                
+                g2.setFont(fuenteOriginal);
+            }
+            
+            // --- DIBUJAR ZONA SEGURA DE LA PC (SALONES) ---
+            if (misionPCActiva) {
+                // Fondo Celeste semitransparente
+                g2.setColor(new Color(0, 255, 255, 50)); 
+                g2.fillRect(zonaSeguraPC.x, zonaSeguraPC.y, zonaSeguraPC.width, zonaSeguraPC.height);
+                
+                // Borde Celeste punteado
+                g2.setColor(Color.CYAN);
+                Stroke oldStroke = g2.getStroke();
+                g2.setStroke(new java.awt.BasicStroke(3, java.awt.BasicStroke.CAP_BUTT, java.awt.BasicStroke.JOIN_BEVEL, 0, new float[]{10}, 0));
+                g2.drawRect(zonaSeguraPC.x, zonaSeguraPC.y, zonaSeguraPC.width, zonaSeguraPC.height);
+                g2.setStroke(oldStroke);
+                
+                Font fuenteOriginal = g2.getFont();
+                
+                // Textos
+                g2.setColor(Color.WHITE);
+                g2.setFont(new Font("Arial", Font.BOLD, 18));
+                g2.drawString("APAGANDO SISTEMA...", zonaSeguraPC.x + 25, zonaSeguraPC.y - 10);
+                
+                g2.setColor(Color.CYAN);
+                g2.setFont(new Font("Arial", Font.BOLD, 28));
+                g2.drawString(tiempoMisionPC + "s", zonaSeguraPC.x + (zonaSeguraPC.width/2) - 15, zonaSeguraPC.y + 35);
+                
+                g2.setFont(fuenteOriginal);
             }
             
 
@@ -1046,16 +1401,91 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 }
             }
             
-            // 5. PANTALLA REPORTE
+            // --- NUEVO: CAMPO DE VISIÓN (Niebla de Guerra) ---
+            int centroPantallaX = getWidth() / 2; // Siempre estamos en el centro
+            int centroPantallaY = getHeight() / 2;
+            
+            // Radio: Impostor = 450 (amplio). Tripulante = 450 normal, 120 saboteado.
+            float radioVision;
+            if (miJugador != null && miJugador.getEsImpostor()) {
+                radioVision = 450f; 
+            } else {
+                radioVision = visionSaboteada ? 120f : 300f;
+            }
+
+            // Crear el gradiente oscuro (Transparente en el centro, negro en los bordes)
+            float[] distancias = {0.0f, 0.6f, 1.0f};
+            Color[] colores = {
+                new Color(0, 0, 0, 0),     // Centro totalmente transparente
+                new Color(0, 0, 0, 180),   // Borde difuminado
+                new Color(0, 0, 0, 255)    // Exterior negro total (Ciego)
+            };
+            
+            java.awt.RadialGradientPaint niebla = new java.awt.RadialGradientPaint(
+                new java.awt.geom.Point2D.Float(centroPantallaX, centroPantallaY), 
+                radioVision, distancias, colores);
+            
+            // Guardamos el color original, pintamos la niebla y restauramos
+            Paint pinturaOriginal = g2.getPaint();
+            g2.setPaint(niebla);
+            g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.setPaint(pinturaOriginal);
+            
+            // 5. PANTALLA REPORTE / EMERGENCIA
             if (mostrandoAnimacionReporte) {
                 g2.setColor(new Color(0, 0, 0, 150));
                 g2.fillRect(0, 0, getWidth(), getHeight());
                 int centroX = getWidth() / 2;
                 int centroY = getHeight() / 2;
 
-                if (imgReporteFondo != null && imgReporteTexto != null) {
-                    g2.drawImage(imgReporteFondo, centroX - 400, centroY - 175, 800, 350, this);
-                    g2.drawImage(imgReporteTexto, centroX - 150, centroY - 130, 300, 260, this);
+                if (esEmergenciaActual) {
+                    // --- ANIMACIÓN DE EMERGENCIA ---
+                    if (imgEmergenciaFondo != null) {
+                        g2.drawImage(imgEmergenciaFondo, centroX - 400, centroY - 175, 800, 350, this);
+                        g2.drawImage(imgEmergenciaTexto, centroX - 186, centroY - 140, 373, 178, this);
+                        
+                        // --- NUEVAS COORDENADAS DE ENSAMBLAJE ---
+                        
+                        // 1. Bajamos la mesa entera (Cambiamos de +30 a +100)
+                        int mesaX = centroX - 112; 
+                        int mesaY = centroY + 100; 
+                        
+                        // 2. Acomodamos el Cuerpo (Más al centro y asomándose por detrás)
+                        int cuerpoX = mesaX + 50;  // Antes era +170, ahora está centrado
+                        int cuerpoY = mesaY - 60;  // Lo subimos un poco para que asome detrás de la mesa
+                        
+                        // 3. Acomodamos la Mano (Justo en el medio golpeando el botón)
+                        int manoX = mesaX + 90;    
+                        int manoY = mesaY + 6;     
+                        
+                        // --- DIBUJO EN EL ORDEN CORRECTO (De atrás hacia adelante) ---
+                        
+                        // Primero el cuerpo (atrás)
+                        if (imgEmergenciaCuerpoPintado != null) {
+                            g2.drawImage(imgEmergenciaCuerpoPintado, cuerpoX, cuerpoY, 121, 98, this);
+                        }
+                        
+                        // Luego la mesa (en medio)
+                        if (imgEmergenciaMesa != null) {
+                            g2.drawImage(imgEmergenciaMesa, mesaX, mesaY, 225, 81, this);
+                        }
+                        
+                        // Finalmente la mano golpeando (adelante)
+                        if (imgEmergenciaManoPintada != null) {
+                            g2.drawImage(imgEmergenciaManoPintada, manoX, manoY, 56, 30, this); 
+                        }
+                    } else {
+                        // SI LAS IMÁGENES NO CARGARON, DIBUJAMOS ESTO COMO RESPALDO
+                        g2.setColor(Color.RED);
+                        g2.setFont(new Font("Arial", Font.BOLD, 40));
+                        g2.drawString("¡EMERGENCIA! (Faltan Imágenes)", centroX - 250, centroY);
+                    }
+                } else {
+                    // --- ANIMACIÓN DE DEAD BODY (La que ya tenías) ---
+                    if (imgReporteFondo != null && imgReporteTexto != null) {
+                        g2.drawImage(imgReporteFondo, centroX - 400, centroY - 175, 800, 350, this);
+                        g2.drawImage(imgReporteTexto, centroX - 150, centroY - 130, 300, 205, this);
+                    }
                 }
             }
             
@@ -1431,7 +1861,7 @@ while (!todosLosPixelesRojos.isEmpty()) {
     if (contadorPasos >= 20) { // Suena un paso cada 300ms aprox
         // Aquí podrías detectar el color del suelo para elegir carpeta, 
         // por ahora usemos Tile como base:
-        GestorSonido.jugar("Footsteps/Tile/FootstepTile.wav");
+        GestorSonido.jugar("Footsteps/Tile/FootstepTile01.wav");
         contadorPasos = 0;
     }
         } else {
@@ -1445,6 +1875,43 @@ while (!todosLosPixelesRojos.isEmpty()) {
                                  + "," + miMuñeco.isMirandoDerecha() + ",false";
                 clienteRed.enviar(mensaje);
                 estabaMoviendose = false; 
+            }
+        }
+        
+        // --- DETECTOR DE FUGA PARA LA MISIÓN DEL SERVIDOR ---
+        if (misionServidorActiva && miMuñeco != null) {
+            int pieX = (int) miMuñeco.getX() + 25;
+            int pieY = (int) miMuñeco.getY() + 55;
+            
+            // Si el jugador se sale del rectángulo delimitado
+            if (!zonaSeguraServidor.contains(pieX, pieY)) {
+                System.out.println("❌ Te saliste de la zona de red. Reinicio cancelado.");
+                
+                if (timerMisionServidor != null) timerMisionServidor.stop();
+                misionServidorActiva = false;
+                starina_among_us.modelo.GestorSonido.jugar("general_sounds/Panel_GenericDisappear.wav"); // Sonido de error/cierre
+                
+                // Si el jugador sigue dentro de la zona de interacción pequeña, le devolvemos el botón Use
+                if (tareaActualEnZona != null && tareaActualEnZona.getId().equals("SALONES_SERVIDOR")) {
+                    botonUse.setEnabled(true);
+                }
+            }
+        }
+        
+        // --- DETECTOR DE FUGA PARA LA PC ---
+        if (misionPCActiva && miMuñeco != null) {
+            int pieX = (int) miMuñeco.getX() + 25;
+            int pieY = (int) miMuñeco.getY() + 55;
+            
+            if (!zonaSeguraPC.contains(pieX, pieY)) {
+                System.out.println("❌ Te saliste de la zona de la PC. Apagado cancelado.");
+                if (timerMisionPC != null) timerMisionPC.stop();
+                misionPCActiva = false;
+                starina_among_us.modelo.GestorSonido.jugar("general_sounds/Panel_GenericDisappear.wav");
+                
+                if (tareaActualEnZona != null && tareaActualEnZona.getId().equals("SALONES_PC")) {
+                    botonUse.setEnabled(true);
+                }
             }
         }
         
@@ -1468,7 +1935,7 @@ while (!todosLosPixelesRojos.isEmpty()) {
             for (Jugador otro : jugadoresConectados.values()) {
                 if (otro.getId() == miId) continue; 
                 if (!otro.isVivo()) continue;    
-                if (otro.esImpostor()) continue; 
+                if (otro.esImpostor()) continue; // (Si tu método se llama getEsImpostor(), cámbialo)
 
                 double otroCentroX = otro.getX() + 25;
                 double otroCentroY = otro.getY() + 25;
@@ -1485,17 +1952,27 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 }
             }
             
-            if (victimaPotencial != null) {
-                if (idVictimaCercana != victimaPotencial.getId()) {
-                    idVictimaCercana = victimaPotencial.getId();
-                    botonKill.setEnabled(true);
-                    System.out.println("🎯 MIRA FIJADA EN: Jugador " + idVictimaCercana);
-                }
-            } else {
+            // --- LA MAGIA DEL COOLDOWN AQUÍ ---
+            if (cooldownKill > 0) {
+                // Si el reloj sigue corriendo, el botón se queda apagado sí o sí
                 if (botonKill.isEnabled()) {
                     botonKill.setEnabled(false);
-                    idVictimaCercana = -1;
-                    System.out.println("❌ Nadie cerca");
+                }
+                idVictimaCercana = -1; // No fijamos mira si el arma está "descargada"
+            } else {
+                // ¡El arma está cargada! Procedemos normal:
+                if (victimaPotencial != null) {
+                    if (idVictimaCercana != victimaPotencial.getId()) {
+                        idVictimaCercana = victimaPotencial.getId();
+                        botonKill.setEnabled(true);
+                        System.out.println("🎯 MIRA FIJADA EN: Jugador " + idVictimaCercana);
+                    }
+                } else {
+                    if (botonKill.isEnabled()) {
+                        botonKill.setEnabled(false);
+                        idVictimaCercana = -1;
+                        System.out.println("❌ Nadie cerca");
+                    }
                 }
             }
         }
@@ -1528,40 +2005,47 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 }
             }
 
-            // 3. LÓGICA DE BOTONES
-            if (tocandoRojo) {
-                if (this.miJugador.getEsImpostor()) {
-                    botonVent.setEnabled(true);
-                    
-                    double distMin = Double.MAX_VALUE;
-                    for (int i = 0; i < listaVents.size(); i++) {
-                        double d = listaVents.get(i).distance(pieX, pieY);
-                        if (d < distMin) {
-                            distMin = d;
-                            idVentCercana = i;
-                        }
+            // 3. LÓGICA DE BOTONES Y RADARES UNIFICADA
+            cercaBotonEmergencia = false;
+            boolean encenderBotonUse = false; // Bandera maestra para el botón USE
+
+            // A) Radar de Alcantarillas (Rojo)
+            if (tocandoRojo && this.miJugador.getEsImpostor()) {
+                botonVent.setEnabled(true);
+                double distMin = Double.MAX_VALUE;
+                for (int i = 0; i < listaVents.size(); i++) {
+                    double d = listaVents.get(i).distance(pieX, pieY);
+                    if (d < distMin) {
+                        distMin = d;
+                        idVentCercana = i;
                     }
                 }
-                botonUse.setEnabled(false);
-            } 
-            else if (tocandoVerde) {
-                if (!this.miJugador.getEsImpostor()) {
-                    // Preguntamos al Gestor si hay una tarea AQUÍ que NO esté completada
-                    tareaActualEnZona = gestorTareas.obtenerTareaEnZona(pieX, pieY);
-                    
-                    if (tareaActualEnZona != null) {
-                        botonUse.setEnabled(true); // ¡Se ilumina!
-                    } else {
-                        botonUse.setEnabled(false); // Se pone transparente (ya la hicimos)
-                    }
-                }
+            } else {
                 botonVent.setEnabled(false);
-            } 
-            else {
-                botonVent.setEnabled(false);
-                botonUse.setEnabled(false); // Lejos de cualquier zona, siempre transparente
-                tareaActualEnZona = null; 
             }
+            
+            // B) Radar de Misiones (Verde)
+            if (tocandoVerde && !this.miJugador.getEsImpostor()) {
+                tareaActualEnZona = gestorTareas.obtenerTareaEnZona(pieX, pieY);
+                if (tareaActualEnZona != null) {
+                    encenderBotonUse = true; // Se ilumina porque hay una misión
+                }
+            } else {
+                tareaActualEnZona = null;
+            }
+
+            // --- C) RADAR DE EMERGENCIA (Zona Celeste) ---
+            if (zonaEmergencia != null && zonaEmergencia.contains(pieX, pieY)) {
+                // Si el jugador está vivo (sea impostor o tripulante), puede tocar el botón
+                if (miJugador != null && miJugador.isVivo()) {
+                    cercaBotonEmergencia = true;
+                    encenderBotonUse = true; // Se ilumina porque estamos en la mesa
+                }
+            }
+
+            // --- ¡LA DECISIÓN FINAL! ---
+            // Aplicamos el encendido/apagado UNA SOLA VEZ, para que no haya peleas de código
+            botonUse.setEnabled(encenderBotonUse);
         }
         
         
@@ -1595,6 +2079,8 @@ while (!todosLosPixelesRojos.isEmpty()) {
                 idCuerpoCercano = -1;
             }
         }
+        
+        
         // --- ACTUALIZAR ANIMACIONES DE TODOS LOS JUGADORES ---
         // Esto es vital para ver mover los pies a los demas (y a ti mismo)
         for (Jugador j : jugadoresConectados.values()) {
@@ -1819,52 +2305,62 @@ public void focusLost(FocusEvent e) {
             jugadoresConectados.put(id, nuevo);
         }
     }
-    public void iniciarReunion(int idReportador) {
-        System.out.println("🚨 ANIMACIÓN DE REPORTE INICIADA 🚨");
-        GestorSonido.jugar("general_sounds/report_Bobbyfound.wav");
+    public void iniciarReunion(int idReportador, boolean esEmergencia) {
+        System.out.println("🚨 ANIMACIÓN INICIADA. ¿Es emergencia?: " + esEmergencia);
+        cooldownSabotage = 10;
+        cooldownKill = 10;
         
-        // GUARDAMOS QUIÉN FUE EL HÉROE (O el impostor fingiendo)
         this.idReportadorActual = idReportador;
+        this.esEmergenciaActual = esEmergencia; 
         
-        // 1. ACTIVAR ANIMACIÓN VISUAL
-        mostrandoAnimacionReporte = true;
+        if (esEmergencia) {
+            starina_among_us.modelo.GestorSonido.jugar("general_sounds/Emergency_meeting.wav"); 
+            
+            // --- BLINDAJE ANTI-CRASH PARA COLORES ---
+            Jugador j = jugadoresConectados.get(idReportador);
+            if (j != null && j.getColor() != null) {
+                try {
+                    if (imgEmergenciaCuerpo != null) {
+                        imgEmergenciaCuerpoPintado = starina_among_us.modelo.HerramientasColor.crearPersonaje(imgEmergenciaCuerpo, j.getColor());
+                    }
+                    if (imgEmergenciaMano != null) {
+                        imgEmergenciaManoPintada = starina_among_us.modelo.HerramientasColor.crearPersonaje(imgEmergenciaMano, j.getColor());
+                    }
+                } catch (Exception ex) {
+                    System.out.println("❌ Error al pintar personaje de emergencia: " + ex.getMessage());
+                }
+            }
+        } else {
+            starina_among_us.modelo.GestorSonido.jugar("general_sounds/report_Bobbyfound.wav");
+        }
         
-        // 2. APAGAR CONTROLES (Para que nadie se mueva durante la alerta)
-        botonKill.setEnabled(false);
-        botonReport.setVisible(false);
-        botonReport.setEnabled(false);
+        mostrandoAnimacionReporte = true; // ¡Esto enciende la pantalla negra/roja!
         
-        // Forzamos que se dibuje la pantalla roja INMEDIATAMENTE
+        // Apagamos botones
+        if (botonKill != null) botonKill.setEnabled(false);
+        if (botonReport != null) {
+            botonReport.setVisible(false);
+            botonReport.setEnabled(false);
+        }
+        if (botonUse != null) botonUse.setEnabled(false);
+        
         repaint();
         
-        // --- AQUÍ ESTÁ LA CLAVE: USAMOS UN TIMER, NO UN JOPTIONPANE ---
-        // Esto espera 3000 milisegundos (3 segundos) sin congelar la ventana
-        Timer timerAnimacion = new Timer(3000, new ActionListener() {
+        // --- TIMER DE 3 SEGUNDOS ---
+        Timer timerAnimacion = new Timer(3000, new java.awt.event.ActionListener() {
             @Override
-            public void actionPerformed(ActionEvent e) {
-                
-                // --- ESTO OCURRE DESPUÉS DE LOS 3 SEGUNDOS ---
-                
-                // 1. Quitar la pantalla roja
+            public void actionPerformed(java.awt.event.ActionEvent e) {
                 mostrandoAnimacionReporte = false;
                 
-                // 2. Limpiar cadáveres (Convertirlos en fantasmas transparentes)
                 for (Jugador j : jugadoresConectados.values()) {
-                    if (!j.isVivo()) {
-                        j.setCuerpoReportado(true);
-                    }
+                    if (!j.isVivo()) j.setCuerpoReportado(true);
                 }
                 
-                // 3. Teletransportar A LA ZONA CELESTE (Mesa de Reunión)
                 if (jugadoresConectados.containsKey(miId)) {
                     Jugador yo = jugadoresConectados.get(miId);
-                    
                     if (yo.isVivo()) {
-                        // Usamos las coordenadas del spawn (zona celeste) detectadas en cargarMapa
-                        // Le sumamos un offset aleatorio (entre -40 y 40) para esparcirlos alrededor de la mesa
                         int offsetX = (int)(Math.random() * 80) - 40;
                         int offsetY = (int)(Math.random() * 80) - 40;
-                        
                         int nuevaX = spawnX + offsetX; 
                         int nuevaY = spawnY + offsetY;
                         
@@ -1872,28 +2368,21 @@ public void focusLost(FocusEvent e) {
                         yo.setY(nuevaY);
                         yo.detener();
                         
-                        // Avisar al servidor de nuestra nueva posición
                         clienteRed.enviar("MOV," + miId + "," + nuevaX + "," + nuevaY + "," + yo.isMirandoDerecha() + ",false");
                     }
                 }
                 
-                // 4. Resetear variables de juego
                 idCuerpoCercano = -1;
-                
-                // Recuperar el foco para poder escribir en el chat (cuando lo hagamos)
                 PanelJuego.this.requestFocusInWindow();
-                
-                // DETENER EL TIMER (Para que no se repita infinitamente)
                 ((Timer)e.getSource()).stop(); 
+                if(botonAbrirChat != null) botonAbrirChat.setVisible(true);
                 
-                botonAbrirChat.setVisible(true);
+                // ¡LA TABLET SE ABRE DESPUÉS DE LOS 3 SEGUNDOS!
+                abrirTabletReunion();
             }
         });
-        
-        timerAnimacion.setRepeats(false); // Aseguramos que solo suene una vez
-        timerAnimacion.start(); // ¡CORRE TIEMPO!
-        abrirTabletReunion();
-        
+        timerAnimacion.setRepeats(false);
+        timerAnimacion.start(); 
     }
     
     public void abrirTabletReunion() {
@@ -2303,6 +2792,29 @@ public void completarMisionPizarra() {
             botonUse.setEnabled(false); 
             repaint(); 
         }
+    }
+    
+    
+    public void activarSabotajeVision() {
+        visionSaboteada = true;
+        tiempoSaboteo = 15; // Dura 15 segundos
+        cooldownSabotage = 50; // ¡Cooldown de 50s compartido para los impostores!
+        
+        // Sonido de alarma si tienes uno
+        starina_among_us.modelo.GestorSonido.jugar("general_sounds/Alarm_sabotage.wav"); 
+        
+        if (timerEfectoSaboteo != null) timerEfectoSaboteo.stop();
+        
+        // Reloj que cuenta los 15 segundos y devuelve la luz
+        timerEfectoSaboteo = new Timer(1000, e -> {
+            tiempoSaboteo--;
+            if (tiempoSaboteo <= 0) {
+                visionSaboteada = false;
+                ((Timer)e.getSource()).stop();
+            }
+            repaint();
+        });
+        timerEfectoSaboteo.start();
     }
     
 }

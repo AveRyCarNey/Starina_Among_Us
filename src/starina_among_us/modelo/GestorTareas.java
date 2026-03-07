@@ -10,7 +10,17 @@ public class GestorTareas {
 
     public GestorTareas() {
         listaTareas = new ArrayList<>();
-        inicializarTareasMapaUni();
+       
+    }
+    
+    public void cargarMisionesPorMapa(String nombreMapa) {
+        listaTareas.clear(); // Limpiamos la lista por si acaso
+        
+        if (nombreMapa.equals("Uni")) {
+            inicializarTareasMapaUni();
+        } else if (nombreMapa.equals("Salones")) {
+            inicializarTareasMapaSalones();
+        }
     }
 
     private void inicializarTareasMapaUni() {
@@ -22,6 +32,17 @@ public class GestorTareas {
         listaTareas.add(new Tarea("PIZARRA_MATH", "Quiz de Matemáticas", new Rectangle(1690, 845, 150, 40)));
         // Misión 4: Biblioteca
         listaTareas.add(new Tarea("BIBLIO_LIBROS", "Organizar Libros", new Rectangle(1000, 1000, 150, 100)));
+    }
+    
+    private void inicializarTareasMapaSalones() {
+        // Misión 1: Reiniciar Servidor 
+        // Interacción exacta que me diste: x=550, y=395, ancho=70, alto=45
+        listaTareas.add(new Tarea("SALONES_SERVIDOR", "Reiniciar Servidor", new Rectangle(550, 395, 70, 45)));
+        
+        // Misión 2: Apagar PC Principal
+        listaTareas.add(new Tarea("SALONES_PC", "Apagar PC", new Rectangle(1300, 850, 145, 120)));
+        
+        
     }
 
     // --- NUEVO MÉTODO DE SEGURIDAD ---

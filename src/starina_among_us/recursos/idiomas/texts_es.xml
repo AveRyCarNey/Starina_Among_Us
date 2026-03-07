@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idioma nombre="Español">
+    <menu_principal>
+        <btn_online>EN LÍNEA</btn_online>
+        <btn_howtoplay>CÓMO JUGAR</btn_howtoplay>
+        <btn_freeplay>MODO LIBRE</btn_freeplay>
+        <lbl_nombre>Tu Nombre:</lbl_nombre>
+        <lbl_ip>IP del Servidor:</lbl_ip>
+    </menu_principal>
+    <ajustes>
+        <titulo>AJUSTES</titulo>
+        <antialiasing>Antialiasing</antialiasing>
+        <musica>Volumen Música</musica>
+        <sfx>Volumen Efectos</sfx>
+        <idioma_actual>Idioma</idioma_actual>
+    </ajustes>
+</idioma>
+

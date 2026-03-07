@@ -125,11 +125,19 @@ public class ClienteRed extends Thread {
                     else if (comando.equals("MUERTE")) {
                         panel.reportarMuerte(Integer.parseInt(partes[1]));
                     }
+                    else if (comando.equals("SABOTAJE_VISION")) {
+                        panel.activarSabotajeVision();
+                    }
                     else if (comando.equals("ROL")) {
                         panel.actualizarRolJugador(Integer.parseInt(partes[1]), Boolean.parseBoolean(partes[2]));
                     }
                     else if (comando.equals("REUNION")) {
-                        panel.iniciarReunion(Integer.parseInt(partes[1]));
+                        // false = Es un reporte de cadáver normal
+                        panel.iniciarReunion(Integer.parseInt(partes[1]), false);
+                    }
+                    else if (comando.equals("EMERGENCIA_RED")) {
+                        // true = Alguien tocó el botón de emergencia en la mesa
+                        panel.iniciarReunion(Integer.parseInt(partes[1]), true);
                     }
                     
                     else if (comando.equals("CHAT")) {

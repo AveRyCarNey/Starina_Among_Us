@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<comment>Configuración de Starina Among Us</comment>
+<entry key="sfx">0.0</entry>
+<entry key="musica">0.0</entry>
+<entry key="idioma">es</entry>
+<entry key="antialiasing">true</entry>
+</properties>

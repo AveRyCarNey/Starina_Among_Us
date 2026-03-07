@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<idioma nombre="English">
+    <menu_principal>
+        <btn_online>ONLINE</btn_online>
+        <btn_howtoplay>HOW TO PLAY</btn_howtoplay>
+        <btn_freeplay>FREEPLAY</btn_freeplay>
+        <lbl_nombre>Your Name:</lbl_nombre>
+        <lbl_ip>Server IP:</lbl_ip>
+    </menu_principal>
+    <ajustes>
+        <titulo>SETTINGS</titulo>
+        <antialiasing>Antialiasing</antialiasing>
+        <musica>Music Volume</musica>
+        <sfx>SFX Volume</sfx>
+        <idioma_actual>Language</idioma_actual>
+    </ajustes>
+</idioma>
