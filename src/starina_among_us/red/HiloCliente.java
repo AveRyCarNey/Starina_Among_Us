@@ -3,9 +3,13 @@ package starina_among_us.red;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
-import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+/**
+ * Hilo de ejecucion en el servidor para manejar la comunicacion con un cliente especifico.
+ * * @author Wulliber Yepez, Carlos Ramirez, Jorg Sierra, Samuel Salazar
+ * @version 1.0
+ */
 public class HiloCliente extends Thread {
 
     private Socket socket;
@@ -16,10 +20,10 @@ public class HiloCliente extends Thread {
     private int id;
     private boolean esImpostor;
     
-    // --- MEMORIA DEL ESTADO DEL JUGADOR (Públicas para acceso rápido) ---
+    // Variables de estado del jugador replicadas en el servidor
     public int x = 50; 
     public int y = 50;
-    public int r = 197, g = 17, b = 17; // Color inicial (Rojo)
+    public int r = 197, g = 17, b = 17; 
     public String nombre = "Tripulante";
     public boolean mirandoDerecha = true;
     public boolean moviendose = false;
@@ -31,95 +35,86 @@ public class HiloCliente extends Thread {
         this.id = id;
         this.esImpostor = impostor;
         
-        // Posición inicial por defecto (para que no aparezcan todos encimados al principio)
+        // Asignacion de posicion inicial escalonada
         this.x = 100 + (id * 30);
         this.y = 200;
         
         try {
             entrada = new DataInputStream(socket.getInputStream());
             salida = new DataOutputStream(socket.getOutputStream());
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) { 
+            e.printStackTrace(); 
+        }
     }
 
     @Override
     public void run() {
         try {
-            // ==========================================
-            // 1. FASE INICIAL: Sincronizar al NUEVO con lo que ya existe
-            // ==========================================
-            
-            // A) Saludo inicial (Tu ID, tu posición, etc.)
-            this.enviarMensaje("BIENVENIDO," + id + "," + esImpostor + "," + x + "," + y);
+            // Sincronizacion inicial del jugador recien conectado
+            this.enviarMensaje("BIENVENIDO," + id + "," + esImpostor + "," + x + "," + y + "," + Servidor.mapaActual);
 
-            // B) Le contamos al NUEVO sobre los jugadores VIEJOS
-for (HiloCliente otro : listaTodos) {
-    if (otro.id != this.id) {
-        // Enviamos R, G, B por separado en el protocolo SINCRO
-        String msjSincro = "SINCRO," + otro.id + "," + 
-                           otro.x + "," + otro.y + "," + 
-                           otro.r + "," + otro.g + "," + otro.b + "," + 
-                           otro.nombre + "," + 
-                           otro.mirandoDerecha;
-        
-        this.enviarMensaje(msjSincro);
-        this.enviarMensaje("ROL," + otro.id + "," + otro.esImpostor);
-        
-        if (!otro.estaVivo) {
-            this.enviarMensaje("MUERTE," + otro.id);
-        }
-    }
-}
+            // Informar al nuevo cliente sobre los jugadores que ya estaban en la sala
+            for (HiloCliente otro : listaTodos) {
+                if (otro.id != this.id) {
+                    String msjSincro = "SINCRO," + otro.id + "," + 
+                                       otro.x + "," + otro.y + "," + 
+                                       otro.r + "," + otro.g + "," + otro.b + "," + 
+                                       otro.nombre + "," + 
+                                       otro.mirandoDerecha;
+                    
+                    this.enviarMensaje(msjSincro);
+                    this.enviarMensaje("ROL," + otro.id + "," + otro.esImpostor);
+                    
+                    if (!otro.estaVivo) {
+                        this.enviarMensaje("MUERTE," + otro.id);
+                    }
+                }
+            }
 
-            // ==========================================
-            // 2. BUCLE DEL JUEGO (Escuchar mensajes)
-            // ==========================================
+            // Bucle principal de escucha de comandos
             while (true) {
                 String mensaje = entrada.readUTF();
                 String[] partes = mensaje.split(",");
                 String comando = partes[0];
                 
-                // --- COMANDO HOLA (Cuando el cliente se presenta) ---
-                // Comando HOLA: HOLA, Nombre, R, G, B
-if (comando.equals("HOLA")) {
-    this.nombre = partes[1];
-    if (partes.length > 4) {
-        this.r = Integer.parseInt(partes[2]);
-        this.g = Integer.parseInt(partes[3]);
-        this.b = Integer.parseInt(partes[4]);
-    }
-    // Presentamos al nuevo enviando SINCRO con sus 3 colores
-    for (HiloCliente otro : listaTodos) {
-        if (otro.id != this.id) {
-            String presentacion = "SINCRO," + this.id + "," + this.x + "," + this.y + "," + 
-                                  this.r + "," + this.g + "," + this.b + "," + 
-                                  this.nombre + "," + this.mirandoDerecha;
-            otro.enviarMensaje(presentacion);
-            
-            otro.enviarMensaje("ROL," + this.id + "," + this.esImpostor);
-        }
-    }
-}
-                
-                // --- COMANDO MOVIMIENTO ---
+                if (comando.equals("HOLA")) {
+                    this.nombre = partes[1];
+                    if (partes.length > 4) {
+                        this.r = Integer.parseInt(partes[2]);
+                        this.g = Integer.parseInt(partes[3]);
+                        this.b = Integer.parseInt(partes[4]);
+                    }
+                    if (this.id == 1 && partes.length > 5) {
+                        Servidor.mapaActual = partes[5];
+                        System.out.println("El Host ha establecido el mapa: " + Servidor.mapaActual);
+                    }
+                    
+                    // Notificar a los demas sobre los datos del nuevo jugador
+                    for (HiloCliente otro : listaTodos) {
+                        if (otro.id != this.id) {
+                            String presentacion = "SINCRO," + this.id + "," + this.x + "," + this.y + "," + 
+                                                  this.r + "," + this.g + "," + this.b + "," + 
+                                                  this.nombre + "," + this.mirandoDerecha;
+                            otro.enviarMensaje(presentacion);
+                            otro.enviarMensaje("ROL," + this.id + "," + this.esImpostor);
+                        }
+                    }
+                }
                 else if (comando.equals("MOV")) {
-    this.x = Integer.parseInt(partes[2]);
-    this.y = Integer.parseInt(partes[3]);
-    // Verificación de seguridad para mensajes cortos
-    if (partes.length > 5) {
-        this.mirandoDerecha = Boolean.parseBoolean(partes[4]);
-        this.moviendose = Boolean.parseBoolean(partes[5]);
-    }
-    broadcast(mensaje, this);
-}
-
-                // --- OTROS COMANDOS ---
+                    this.x = Integer.parseInt(partes[2]);
+                    this.y = Integer.parseInt(partes[3]);
+                    if (partes.length > 5) {
+                        this.mirandoDerecha = Boolean.parseBoolean(partes[4]);
+                        this.moviendose = Boolean.parseBoolean(partes[5]);
+                    }
+                    broadcast(mensaje, this);
+                }
                 else if (comando.equals("COLOR")) {
-    this.r = Integer.parseInt(partes[2]);
-    this.g = Integer.parseInt(partes[3]);
-    this.b = Integer.parseInt(partes[4]);
-    broadcast(mensaje, this);
-}
-                
+                    this.r = Integer.parseInt(partes[2]);
+                    this.g = Integer.parseInt(partes[3]);
+                    this.b = Integer.parseInt(partes[4]);
+                    broadcast(mensaje, this);
+                }
                 else if (comando.equals("MATAR")) {
                     int idVictima = Integer.parseInt(partes[1]);
                     for (HiloCliente c : listaTodos) {
@@ -127,19 +122,13 @@ if (comando.equals("HOLA")) {
                     }
                     broadcast("MUERTE," + idVictima, null);
                 }
-                
                 else if (comando.equals("REPORT")) {
                     broadcast("REUNION," + this.id, null);
                 }
-                
                 else if (comando.equals("RESET_SERVER")) {
-                    // El Host ordenó limpiar la sala para una nueva partida
-                    System.out.println("♻️ REINICIANDO EL SERVIDOR PARA NUEVA PARTIDA...");
+                    System.out.println("Reiniciando el servidor para nueva partida...");
                     listaTodos.clear(); 
-                    // Si tienes otras listas estáticas en el servidor (como votos o tareas), límpialas aquí también.
                 }
-                
-                // Reenvío general para cualquier otro mensaje
                 else {
                     broadcast(mensaje, this);
                 }
@@ -152,7 +141,6 @@ if (comando.equals("HOLA")) {
         }
     }
 
-    // Método auxiliar para enviar mensaje a este cliente
     public void enviarMensaje(String msg) {
         try { 
             if (salida != null) {
@@ -162,7 +150,6 @@ if (comando.equals("HOLA")) {
         } catch (Exception e) {}
     }
     
-    // Método auxiliar para enviar a TODOS (menos al remitente opcional)
     private void broadcast(String msg, HiloCliente remitente) {
         for (HiloCliente c : listaTodos) {
             if (c != remitente) {

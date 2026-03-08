@@ -10,9 +10,16 @@ import javax.swing.JPanel;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 
+/**
+ * Representa una entidad de personaje en el juego, ya sea controlada localmente 
+ * o replicada desde un cliente de red.
+ * Maneja la logica de animacion, fisicas de estado (vivo/muerto, en ventilacion) 
+ * y almacena el color y rol asignado.
+ * * @author Wulliber Yepez, Carlos Ramirez, Jorg Sierra, Samuel Salazar
+ * @version 1.0
+ */
 public class Jugador {
     
-    // ATRIBUTOS
     private int id;
     private String nombre;
     private double x, y;
@@ -21,24 +28,19 @@ public class Jugador {
     private boolean esImpostor;
     private Color colorPersonaje;
     
-    
-    // ESTADOS
     private boolean moviendose = false; 
     private boolean mirandoDerecha = true; 
     private boolean cuerpoReportado = false;
     private boolean haVotado = false;
     
-    // IMÁGENES
     private BufferedImage imgQuietoOriginal, imgMuertoOriginal;
     private BufferedImage imgQuietoPintada, imgMuertoPintada;
-    // Arrays para guardar los pasos (Frames)
-    private BufferedImage[] animacionWalkOriginal; // Los originales
-    private BufferedImage[] animacionWalkPintada;  // Los pintados (Skin actual)
+    private BufferedImage[] animacionWalkOriginal; 
+    private BufferedImage[] animacionWalkPintada;  
     
-    // Control de velocidad
     private int frameActual = 0;
     private long tiempoUltimoFrame = 0;
-    private final int VELOCIDAD_ANIMACION = 60; // Milisegundos entre cada paso
+    private final int VELOCIDAD_ANIMACION = 60; 
     
     private final int ANCHO = 50; 
     private final int ALTO = 60;
@@ -47,65 +49,61 @@ public class Jugador {
     private boolean enVentilacion = false;
     private boolean animandoVent = false;
     
-    
     private java.awt.Color colorOriginal;
 
+    /**
+     * Constructor del Jugador.
+     * Crea la instancia, asigna las coordenadas iniciales y precarga todas las imagenes
+     * necesarias para la animacion de caminata y estado de cadaver.
+     * * @param id Identificador unico de red.
+     * @param nombre Nombre a mostrar sobre la cabeza.
+     * @param x Coordenada de aparicion en el eje X.
+     * @param y Coordenada de aparicion en el eje Y.
+     * @param esImpostor Define el rol del jugador en la partida.
+     */
     public Jugador(int id, String nombre, double x, double y, boolean esImpostor) {
         this.id = id;
         this.nombre = nombre;
         this.x = x;
         this.y = y;
         this.esImpostor = esImpostor;
-        this.velocidad = 5; // Velocidad constante
+        this.velocidad = 5; 
         this.estaVivo = true;
         
-        
-        
-        // 1. Definimos el color por defecto (Rojo Among Us)
         this.colorPersonaje = new Color(197, 17, 17); 
-        
-        
         this.colorOriginal = this.colorPersonaje;
         
-        // 2. Cargamos los moldes (Originales)
         cargarImagenes();
-        
-        // 3. --- ¡LA CORRECCIÓN MÁGICA! ---
-        // Forzamos el pintado inmediato para que no se vea el molde morado al inicio.
         cambiarSkin(this.colorPersonaje);
-        
-        
     }
     
     private void cargarImagenes() {
         try {
-            // Cargar estáticos
             imgQuietoOriginal = ImageIO.read(getClass().getResource("/starina_among_us/recursos/personajes/rozul.png"));
             imgMuertoOriginal = ImageIO.read(getClass().getResource("/starina_among_us/recursos/personajes/rozul_dead.png"));
             
-            // --- CARGAR ANIMACIÓN (12 FRAMES) ---
             animacionWalkOriginal = new BufferedImage[12];
             animacionWalkPintada = new BufferedImage[12];
             
             for (int i = 0; i < 12; i++) {
-                // Asumiendo que tus archivos se llaman "walk_0.png", "walk_1.png", etc.
                 String ruta = "/starina_among_us/recursos/personajes/walk_" + i + ".png";
                 animacionWalkOriginal[i] = ImageIO.read(getClass().getResource(ruta));
-                
-                // Al inicio, la "pintada" es igual a la original (roja)
                 animacionWalkPintada[i] = animacionWalkOriginal[i];
             }
-            
         } catch (Exception e) {
             System.out.println("Error cargando sprites: " + e.getMessage());
-            e.printStackTrace(); // Útil para ver si falló el nombre del archivo
+            e.printStackTrace(); 
         }
     }
     
+    /**
+     * Aplica un nuevo color a todas las imagenes cargadas del jugador utilizando
+     * la herramienta de reemplazo de pixeles.
+     * * @param nuevoColor El color RGB a aplicar.
+     */
     public void cambiarSkin(Color nuevoColor) {
         this.colorPersonaje = nuevoColor;
         
-        // Pintar estáticos
         if (imgQuietoOriginal != null) {
             imgQuietoPintada = HerramientasColor.crearPersonaje(imgQuietoOriginal, nuevoColor);
         }
@@ -113,7 +111,6 @@ public class Jugador {
             imgMuertoPintada = HerramientasColor.crearPersonaje(imgMuertoOriginal, nuevoColor);
         }
         
-        // --- NUEVO: PINTAR ANIMACIÓN ---
         if (animacionWalkOriginal != null) {
             for (int i = 0; i < animacionWalkOriginal.length; i++) {
                 if (animacionWalkOriginal[i] != null) {
@@ -123,22 +120,21 @@ public class Jugador {
         }
     }
 
-    // Método exclusivo para manejar los frames de la animación
+    /**
+     * Avanza el contador de frames de la animacion de caminado.
+     * Se llama en cada iteracion del reloj principal si el jugador se esta moviendo.
+     */
     public void actualizarAnimacion() {
         if (moviendose) {
-            // SOLO LÓGICA DE FRAMES (Sin tocar X ni Y)
             retardoAnimacion++;
-            
-            if (retardoAnimacion > 3) { // Velocidad de la animación
+            if (retardoAnimacion > 3) { 
                 frameActual++; 
-                
                 if (frameActual >= animacionWalkPintada.length) {
                     frameActual = 0;
                 }
                 retardoAnimacion = 0; 
             }
         } else {
-            // Si está quieto, reseteamos al frame 0
             frameActual = 0;
         }
     }
@@ -147,116 +143,83 @@ public class Jugador {
         this.moviendose = false;
     }
     
+    /**
+     * Dibuja al jugador en el lienzo de la ventana principal.
+     * Aplica transformaciones de espejo dependiendo de la direccion a la que mira,
+     * y aplica opacidad si el jugador es un fantasma.
+     * * @param g El contexto grafico proporcionado por Swing.
+     * @param panelObservador El JPanel donde se dibuja.
+     */
     public void dibujar(Graphics g, JPanel panelObservador) {
+        Image imagenActual;
+        boolean esFantasma = false; 
 
-    Image imagenActual;
-    boolean esFantasma = false; // Bandera para saber si aplicamos transparencia
-
-    // --- 1. SELECCIÓN DE IMAGEN ---
-    if (!estaVivo) {
-        if (cuerpoReportado) {
-            // FANTASMA: Muerto y reportado.
-            // Usamos la imagen normal (de pie) pero será transparente
-            imagenActual = imgMuertoPintada; 
-            esFantasma = true; 
-        } else {
-            // CADÁVER RECIENTE: Huesito en el suelo (Opaco)
-            imagenActual = imgMuertoPintada;
-        }
-    } 
-    else if (moviendose) {
-        if (frameActual < animacionWalkPintada.length) {
-            imagenActual = animacionWalkPintada[frameActual];
+        if (!estaVivo) {
+            if (cuerpoReportado) {
+                imagenActual = imgMuertoPintada; 
+                esFantasma = true; 
+            } else {
+                imagenActual = imgMuertoPintada;
+            }
+        } else if (moviendose) {
+            if (frameActual < animacionWalkPintada.length) {
+                imagenActual = animacionWalkPintada[frameActual];
+            } else {
+                imagenActual = imgQuietoPintada;
+            }
         } else {
             imagenActual = imgQuietoPintada;
         }
-    } 
-    else {
-        imagenActual = imgQuietoPintada;
+
+        if (imagenActual != null) {
+            Graphics2D g2 = (Graphics2D) g;
+            Composite originalComposite = g2.getComposite(); 
+
+            if (esFantasma) {
+                g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
+            }
+
+            if (mirandoDerecha) {
+                g2.drawImage(imagenActual, (int)x, (int)y, ANCHO, ALTO, panelObservador);
+            } else {
+                g2.drawImage(imagenActual, (int)x + ANCHO, (int)y, -ANCHO, ALTO, panelObservador);
+            }
+
+            if (esFantasma) {
+                g2.setComposite(originalComposite);
+            }
+
+            g.setColor(Color.WHITE);
+            g.drawString(nombre, (int)x + 10, (int)y - 5);
+        }
     }
-
-    // --- 2. DIBUJADO EN PANTALLA ---
-    if (imagenActual != null) {
-
-        Graphics2D g2 = (Graphics2D) g;
-        Composite originalComposite = g2.getComposite(); // Guardar configuración original
-
-        // SI ES FANTASMA -> 50% TRANSPARENCIA
-        if (esFantasma) {
-            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.5f));
-        }
-
-        // Dibujar (Normal o Espejo)
-        if (mirandoDerecha) {
-            g2.drawImage(imagenActual, (int)x, (int)y, ANCHO, ALTO, panelObservador);
-        } else {
-            g2.drawImage(imagenActual, (int)x + ANCHO, (int)y, -ANCHO, ALTO, panelObservador);
-        }
-
-        // RESTAURAR OPACIDAD (Para que el nombre se lea bien)
-        if (esFantasma) {
-            g2.setComposite(originalComposite);
-        }
-
-        // Dibujar Nombre
-        g.setColor(Color.WHITE);
-        g.drawString(nombre, (int)x + 10, (int)y - 5);
-    }
-}
 
     public double getX() { return x; }
     public double getY() { return y; }
-    public int getId() {
-        return this.id;
-    }
+    public int getId() { return this.id; }
     public void setX(double x) { this.x = x; }
     public void setY(double y) { this.y = y; }
     public boolean isVivo() { return estaVivo; }
     public boolean esImpostor() { return esImpostor; }
-    
     public void setVivo(boolean vivo) { this.estaVivo = vivo; }
-    public void setImpostor(boolean esImpostor) {
-        this.esImpostor = esImpostor;
-    }
-    public void setCuerpoReportado(boolean reportado) {
-        this.cuerpoReportado = reportado;
-    }
-    public String getNombre(){return this.nombre;}
-    public boolean getEsImpostor(){return this.esImpostor;}
-    public boolean isCuerpoReportado() {
-    return cuerpoReportado;
-}
-    public boolean isMoviendose() {
-        return moviendose;
-    }
-
-    public void setMoviendose(boolean moviendose) {
-        this.moviendose = moviendose;
-    }
-
-    public boolean isMirandoDerecha() {
-        return mirandoDerecha;
-    }
-
-    public void setMirandoDerecha(boolean mirandoDerecha) {
-        this.mirandoDerecha = mirandoDerecha;
-    }
+    public void setImpostor(boolean esImpostor) { this.esImpostor = esImpostor; }
+    public void setCuerpoReportado(boolean reportado) { this.cuerpoReportado = reportado; }
+    public String getNombre(){ return this.nombre; }
+    public boolean getEsImpostor(){ return this.esImpostor; }
+    public boolean isCuerpoReportado() { return cuerpoReportado; }
+    public boolean isMoviendose() { return moviendose; }
+    public void setMoviendose(boolean moviendose) { this.moviendose = moviendose; }
+    public boolean isMirandoDerecha() { return mirandoDerecha; }
+    public void setMirandoDerecha(boolean mirandoDerecha) { this.mirandoDerecha = mirandoDerecha; }
+    public boolean isHaVotado() { return haVotado; }
+    public void setHaVotado(boolean haVotado) { this.haVotado = haVotado; }
+    public boolean isEnVentilacion() { return enVentilacion; }
+    public void setEnVentilacion(boolean enVentilacion) { this.enVentilacion = enVentilacion; }
     
-    public boolean isHaVotado() {
-        return haVotado;
-    }
-
-    public void setHaVotado(boolean haVotado) {
-        this.haVotado = haVotado;
-    }
-    
-    public boolean isEnVentilacion() {
-        return enVentilacion;
-    }
-    public void setEnVentilacion(boolean enVentilacion) {
-        this.enVentilacion = enVentilacion;
-    }
-    
+    /**
+     * Aplica un color prestablecido segun un ID numerico.
+     * * @param colorID Numero del 1 al 5 que representa un color.
+     */
     public void setColorManual(int colorID) {
         Color realColor;
         switch(colorID) {
@@ -267,38 +230,25 @@ public class Jugador {
             case 5: realColor = Color.CYAN; break;
             default: realColor = new Color(197, 17, 17); break; 
         }
-        
         this.colorPersonaje = realColor;
-        this.colorOriginal = realColor; // <-- ¡NUEVO: Actualizamos el color original!
+        this.colorOriginal = realColor; 
         this.cambiarSkin(realColor); 
     }
 
     public void setColorRGB(int r, int g, int b) {
         this.colorPersonaje = new Color(r, g, b);
-        this.colorOriginal = this.colorPersonaje; // <-- ¡NUEVO: Actualizamos el color original!
+        this.colorOriginal = this.colorPersonaje; 
         this.cambiarSkin(this.colorPersonaje);
     }
-public Color getColor() {
-        return this.colorPersonaje;
-    }
 
-// Método para recuperar el color original
-    public java.awt.Color getColorOriginal() {
-        return this.colorOriginal;
-    }
+    public Color getColor() { return this.colorPersonaje; }
+    public java.awt.Color getColorOriginal() { return this.colorOriginal; }
 
-    // Método para cambiar el color temporalmente durante la tarea
     public void setColorTemporal(java.awt.Color nuevoColor) {
-        this.colorPersonaje = nuevoColor; // Cambia "this.color" por tu variable real si se llama distinto
-        
+        this.colorPersonaje = nuevoColor; 
         this.cambiarSkin(nuevoColor);
     }
-
     
-public boolean isAnimandoVent() {
-    return animandoVent;
-}
-public void setAnimandoVent(boolean animandoVent) {
-    this.animandoVent = animandoVent;
-}
+    public boolean isAnimandoVent() { return animandoVent; }
+    public void setAnimandoVent(boolean animandoVent) { this.animandoVent = animandoVent; }
 }

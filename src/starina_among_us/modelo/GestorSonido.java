@@ -3,25 +3,31 @@ package starina_among_us.modelo;
 import javax.sound.sampled.*;
 import java.net.URL;
 
+/**
+ * Gestor global encargado del subsistema de audio del juego.
+ * Permite reproducir musica de fondo en bucle y efectos de sonido simultaneos
+ * utilizando hilos separados. Tambien maneja la conversion matematica de volumen lineal a decibelios.
+ * * @author Wulliber Yepez, Carlos Ramirez, Jorg Sierra, Samuel Salazar
+ * @version 1.0
+ */
 public class GestorSonido {
     private static Clip clipMusica; 
     
-    // --- VARIABLES DE VOLUMEN (Escala lineal 0.0 a 1.0) ---
-    // Guardamos valores entre 0 y 1 para que los Sliders funcionen fácil.
     private static float volumenMusica = 0.5f; 
     private static float volumenEfectos = 0.5f; 
 
     /**
-     * Reproduce música en bucle infinito.
-     * @param archivo Nombre del archivo (ej: "intro.wav")
+     * Inicia la reproduccion de una pista de musica ambiental en bucle infinito.
+     * Detiene automaticamente cualquier otra pista que este sonando.
+     * * @param archivo El nombre y extension del archivo de sonido (ej: "intro.wav").
      */
     public static synchronized void musicaLoop(String archivo) {
-        detenerMusica(); // Evita que se solapen dos canciones
+        detenerMusica(); 
 
         try {
             URL url = GestorSonido.class.getResource("/starina_among_us/recursos/sonidos/" + archivo);
             if (url == null) {
-                System.err.println("No se encontró el archivo de sonido: " + archivo);
+                System.err.println("No se encontro el archivo de sonido: " + archivo);
                 return;
             }
 
@@ -29,7 +35,6 @@ public class GestorSonido {
             clipMusica = AudioSystem.getClip();
             clipMusica.open(ais);
             
-            // Aplicar el volumen actual antes de empezar
             actualizarVolumenMusica(); 
             
             clipMusica.loop(Clip.LOOP_CONTINUOUSLY);
@@ -40,8 +45,9 @@ public class GestorSonido {
     }
 
     /**
-     * Reproduce un efecto de sonido una sola vez (SFX).
-     * @param archivo Nombre del archivo (ej: "kill.wav")
+     * Reproduce un efecto de sonido corto una sola vez.
+     * Se ejecuta en un nuevo hilo para no interrumpir ni pausar el motor grafico.
+     * * @param archivo El nombre del archivo de efecto de sonido (ej: "kill.wav").
      */
     public static void jugar(String archivo) {
         new Thread(() -> {
@@ -52,21 +58,15 @@ public class GestorSonido {
                     Clip clip = AudioSystem.getClip();
                     clip.open(audioIn);
                     
-                    // Aplicar volumen lineal convertido a Decibelios
                     aplicarVolumen(clip, volumenEfectos);
-                    
                     clip.start();
-                    // El clip se libera automáticamente al terminar si no se guarda referencia
                 }
             } catch (Exception e) {
-                System.err.println("Error en jugar (SFX): " + archivo);
+                System.err.println("Error en jugar efecto: " + archivo);
             }
         }).start();
     }
 
-    /**
-     * Ajusta el volumen del Clip actual de música.
-     */
     private static void actualizarVolumenMusica() {
         if (clipMusica != null) {
             aplicarVolumen(clipMusica, volumenMusica);
@@ -74,36 +74,34 @@ public class GestorSonido {
     }
 
     /**
-     * Método interno para convertir volumen lineal (0-1) a Decibelios y aplicarlo.
+     * Convierte un valor de volumen lineal en una escala logaritmica de decibelios
+     * y se lo aplica directamente a un Clip de audio de Java.
+     * * @param clip El objeto Clip de Java Sound a modificar.
+     * @param valorLineal Nivel de volumen deseado (0.0 es silencio, 1.0 es maximo).
      */
     private static void aplicarVolumen(Clip clip, float valorLineal) {
         try {
-            // --- 1. SILENCIO ABSOLUTO (MUTE) ---
             if (clip.isControlSupported(BooleanControl.Type.MUTE)) {
                 BooleanControl muteControl = (BooleanControl) clip.getControl(BooleanControl.Type.MUTE);
                 if (valorLineal <= 0.001f) {
-                    muteControl.setValue(true); // ¡Corta la señal de audio por completo!
-                    return; // Salimos de la función, ya no hay que calcular decibelios
+                    muteControl.setValue(true);
+                    return; 
                 } else {
-                    muteControl.setValue(false); // Le quitamos el Mute si el jugador sube el slider
+                    muteControl.setValue(false); 
                 }
             }
 
-            // --- 2. CÁLCULO DE VOLUMEN NORMAL ---
             if (clip.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 FloatControl gainControl = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
                 
-                // Fallback por si la PC no soporta Mute
                 if (valorLineal <= 0.001f) {
                     gainControl.setValue(gainControl.getMinimum());
                     return;
                 }
 
-                // Fórmula logarítmica estándar
                 float dB = (float) (Math.log10(valorLineal) * 20.0);
-                dB += 3.0f; // Pequeño boost para que suene vivo
+                dB += 3.0f; 
 
-                // Aseguramos que el valor esté dentro de los límites
                 float min = gainControl.getMinimum();
                 float max = gainControl.getMaximum();
                 gainControl.setValue(Math.max(min, Math.min(max, dB)));
@@ -114,7 +112,7 @@ public class GestorSonido {
     }
 
     /**
-     * Detiene y libera la música actual.
+     * Detiene la musica de fondo actual y libera los recursos de memoria asociados.
      */
     public static synchronized void detenerMusica() {
         if (clipMusica != null) {
@@ -124,13 +122,19 @@ public class GestorSonido {
         }
     }
     
-    // --- SETTERS PARA LOS SLIDERS DEL MENÚ ---
-
+    /**
+     * Define el volumen maestro para la musica ambiental.
+     * * @param vol Nivel de volumen entre 0.0 y 1.0.
+     */
     public static void setVolumenMusica(float vol) { 
         volumenMusica = vol; 
         actualizarVolumenMusica();
     }
 
+    /**
+     * Define el volumen maestro para los efectos de sonido.
+     * * @param vol Nivel de volumen entre 0.0 y 1.0.
+     */
     public static void setVolumenEfectos(float vol) { 
         volumenEfectos = vol; 
     }

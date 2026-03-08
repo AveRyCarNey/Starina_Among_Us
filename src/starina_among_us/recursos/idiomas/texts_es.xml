@@ -1,18 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <idioma nombre="Español">
-    <menu_principal>
-        <btn_online>EN LÍNEA</btn_online>
-        <btn_howtoplay>CÓMO JUGAR</btn_howtoplay>
-        <btn_freeplay>MODO LIBRE</btn_freeplay>
-        <lbl_nombre>Tu Nombre:</lbl_nombre>
-        <lbl_ip>IP del Servidor:</lbl_ip>
-    </menu_principal>
-    <ajustes>
-        <titulo>AJUSTES</titulo>
-        <antialiasing>Antialiasing</antialiasing>
-        <musica>Volumen Música</musica>
-        <sfx>Volumen Efectos</sfx>
-        <idioma_actual>Idioma</idioma_actual>
-    </ajustes>
-</idioma>
+    <lbl_nombre>TU NOMBRE:</lbl_nombre>
+    <lbl_color>COLOR DEL TRAJE:</lbl_color>
+    <lbl_mapa>MAPA (Solo afecta si eres HOST):</lbl_mapa>
+    <lbl_ip>IP DEL SERVIDOR:</lbl_ip>
+    <btn_host>CREAR</btn_host>
+    <btn_join>UNIRSE</btn_join>
+    <btn_atras>◄ ATRÁS</btn_atras>
+    <lbl_rol>SELECCIONA TU ROL:</lbl_rol>
+    <lbl_sel_mapa>SELECCIONA UN MAPA PARA EXPLORAR:</lbl_sel_mapa>
+    <btn_cerrar>CERRAR</btn_cerrar>
+    
+    <btn_esperando>ESPERANDO JUGADORES...</btn_esperando>
+    <btn_iniciar>¡INICIAR PARTIDA!</btn_iniciar>
+    <btn_faltan>Faltan jugadores...</btn_faltan>
+    <lbl_sala>SALA DE ESPERA</lbl_sala>
+    <lbl_conectados>Jugadores conectados:</lbl_conectados>
+    <lbl_esperando_host>Esperando a que el Host inicie...</lbl_esperando_host>
+    <lbl_espectando>ESPECTANDO A:</lbl_espectando>
+    <lbl_reiniciando>REINICIANDO SERVIDOR...</lbl_reiniciando>
+    <lbl_apagando>APAGANDO SISTEMA...</lbl_apagando>
+    
+    <lbl_quien_es>¿Quién es el Impostor?</lbl_quien_es>
+    <lbl_voto_termina>La votación termina en:</lbl_voto_termina>
+    <lbl_voto_fin>Votación finalizada.</lbl_voto_fin>
+    <lbl_fue_expulsado>fue expulsado.</lbl_fue_expulsado>
+    <lbl_nadie_expulsado>Nadie fue expulsado. (Empate / Skipped)</lbl_nadie_expulsado>
+    <lbl_ganan_imp>Ganan los: IMPOSTORES</lbl_ganan_imp>
+    <lbl_ganan_trip>Ganan los: TRIPULANTES</lbl_ganan_trip>
+    <lbl_ganan_tareas>¡TAREAS COMPLETADAS! Ganan Tripulantes</lbl_ganan_tareas>
+    <btn_rol_tripulante>ROL: TRIPULANTE</btn_rol_tripulante>
+    <btn_rol_impostor>ROL: IMPOSTOR</btn_rol_impostor>
+    <lbl_musica>MÚSICA</lbl_musica>
+    <lbl_efectos>EFECTOS (SFX)</lbl_efectos>
+    <chk_aa>SUAVIZADO (AA)</chk_aa>
+    <btn_mapa_uni>MAPA: UNI</btn_mapa_uni>
+    <btn_mapa_salones>MAPA: SALONES</btn_mapa_salones>
+    <lbl_quiz_titulo>EXAMEN DE PIZARRA (Responde 3 seguidas)</lbl_quiz_titulo>
+    <lbl_pc_titulo>SISTEMA CENTRAL (Ingresa la contraseña)</lbl_pc_titulo>
+    <btn_kill_fall>MATAR</btn_kill_fall>
+    <btn_report_fall>REPORTE</btn_report_fall>
+    <lbl_pc_titulo>SISTEMA CENTRAL (Ingresa la contraseña)</lbl_pc_titulo>
+    <lbl_oficina_titulo>ORDENAR PAPELES (Arrástralos en orden)</lbl_oficina_titulo>
+    <lbl_biblio_titulo>BIBLIOTECA (Acomoda los libros)</lbl_biblio_titulo>
+    
+    <lbl_pc_ingrese>Ingrese Contraseña:</lbl_pc_ingrese>
+    <lbl_pc_concedido>ACCESO CONCEDIDO</lbl_pc_concedido>
+    <lbl_pc_apagando>APAGANDO...</lbl_pc_apagando>
+    <lbl_pc_denegado>ACCESO DENEGADO</lbl_pc_denegado>
+    
+    <lbl_oficina_titulo>Ordena el Trabajo Final (Arrastra y Suelta)</lbl_oficina_titulo>
+    <lbl_oficina_pag>Pág</lbl_oficina_pag>
+    
+    <lbl_biblio_fase1>FASE 1: Ordena los libros Alfabéticamente (A - Z)</lbl_biblio_fase1>
+    <lbl_biblio_fase2>FASE 2: Ahora ordénalos por Puntuación (Menor a Mayor)</lbl_biblio_fase2>
+    
+    <lbl_impostores>CANTIDAD IMPOSTORES (Solo Host):</lbl_impostores>
+    
+    <msg_mapa_error>Error: El Host está jugando en el mapa: </msg_mapa_error>
+    <msg_mapa_titulo>Mapa Incorrecto</msg_mapa_titulo>
+    
+    <lbl_how_to_title>CÓMO JUGAR</lbl_how_to_title>
+    <msg_how_to_body>• Usa las FLECHAS o WASD para moverte.&#10;• Como TRIPULANTE: Completa tareas (Botón USE) para ganar.&#10;• Como IMPOSTOR: Elimina tripulantes sin ser visto y sabotea la visión.&#10;• Reporta cuerpos o convoca reuniones para expulsar al impostor.</msg_how_to_body>
 
+    <lbl_about_title>ACERCA DE</lbl_about_title>
+    <msg_about_body>IDE: Apache Netbeans 27&#10;Librerías: Swing, AWT, Java Sound API&#10;Versión Actual: 1.0.0&#10;Desarrolladores: WuLliBer Yepez, Carlos Ramirez,&#10;Samuel Salazar, Jorg Sierra </msg_about_body>
+    <msg_sala_llena>No puedes entrar. La sala ya tiene el limite de 10 jugadores.</msg_sala_llena>
+    
+    <lbl_estanteria_fase1>FASE 1/3: ORDENA DEL 1 AL 10</lbl_estanteria_fase1>
+    <lbl_estanteria_fase2>FASE 2/3: ORDENA DEL 10 AL 1</lbl_estanteria_fase2>
+    <lbl_estanteria_fase3>FASE 3/3: ORDEN ALEATORIO</lbl_estanteria_fase3>
+</idioma>

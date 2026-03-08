@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<preguntas>
+    <pregunta>
+        <texto>What is the derivative of x^2?</texto>
+        <correcta>2x</correcta>
+        <falsa1>x^3</falsa1>
+        <falsa2>2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>What is 54 / 6?</texto>
+        <correcta>9</correcta>
+        <falsa1>7</falsa1>
+        <falsa2>8</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Graph of f(x) = x^2?</texto>
+        <correcta>Parabola</correcta>
+        <falsa1>Straight line</falsa1>
+        <falsa2>Wave</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Integral of cos(x)?</texto>
+        <correcta>sin(x)</correcta>
+        <falsa1>-sin(x)</falsa1>
+        <falsa2>tan(x)</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Square root of 144?</texto>
+        <correcta>12</correcta>
+        <falsa1>14</falsa1>
+        <falsa2>16</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>What is an isosceles triangle?</texto>
+        <correcta>2 equal sides</correcta>
+        <falsa1>3 equal sides</falsa1>
+        <falsa2>Zero equal sides</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Result of 2 + 2 * 4?</texto>
+        <correcta>10</correcta>
+        <falsa1>16</falsa1>
+        <falsa2>8</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Formula for the area of a circle?</texto>
+        <correcta>π * r^2</correcta>
+        <falsa1>2 * π * r</falsa1>
+        <falsa2>π * d</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Solution to 3x - 6 = 0?</texto>
+        <correcta>x = 2</correcta>
+        <falsa1>x = -2</falsa1>
+        <falsa2>x = 3</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Value of sine of 90 degrees?</texto>
+        <correcta>1</correcta>
+        <falsa1>0</falsa1>
+        <falsa2>-1</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>What is a prime number?</texto>
+        <correcta>Divisible by 1 and itself</correcta>
+        <falsa1>Any odd number</falsa1>
+        <falsa2>Divisible by 2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Base 10 logarithm of 100?</texto>
+        <correcta>2</correcta>
+        <falsa1>10</falsa1>
+        <falsa2>1</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Pythagorean Theorem formula?</texto>
+        <correcta>a^2 + b^2 = c^2</correcta>
+        <falsa1>a + b = c</falsa1>
+        <falsa2>a^2 - b^2 = c^2</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>What is 7 * 8?</texto>
+        <correcta>56</correcta>
+        <falsa1>48</falsa1>
+        <falsa2>64</falsa2>
+    </pregunta>
+    <pregunta>
+        <texto>Approximate value of PI (π)?</texto>
+        <correcta>3.1416</correcta>
+        <falsa1>3.1614</falsa1>
+        <falsa2>3.1415</falsa2>
+    </pregunta>
+</preguntas>

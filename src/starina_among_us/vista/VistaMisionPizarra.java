@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package starina_among_us.vista;
 
 import javax.swing.*;
@@ -10,7 +6,6 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 
-// Librerías nativas de Java para leer XML
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.DocumentBuilder;
 import org.w3c.dom.Document;
@@ -18,6 +13,13 @@ import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
 import org.w3c.dom.Element;
 
+/**
+ * Ventana emergente que presenta un Quiz de Matematicas escolar.
+ * Lee y carga preguntas dinamicamente desde un documento XML de recursos locales.
+ * El jugador debe responder preguntas correctamente de manera consecutiva.
+ * * @author Wulliber Yepez, Carlos Ramirez, Jorg Sierra, Samuel Salazar
+ * @version 1.0
+ */
 public class VistaMisionPizarra extends JDialog {
 
     private PanelJuego panelPadre;
@@ -29,8 +31,12 @@ public class VistaMisionPizarra extends JDialog {
     private JProgressBar barraProgreso;
     private String respuestaCorrectaActual;
 
+    /**
+     * Constructor principal del minijuego de la Pizarra.
+     * * @param padre Instancia del panel base del juego para validacion de red.
+     */
     public VistaMisionPizarra(PanelJuego padre) {
-        super(SwingUtilities.getWindowAncestor(padre), "Quiz de Matemáticas", Dialog.ModalityType.APPLICATION_MODAL);
+        super(SwingUtilities.getWindowAncestor(padre), "Quiz de Matematicas", Dialog.ModalityType.APPLICATION_MODAL);
         this.panelPadre = padre;
         
         setSize(800, 500);
@@ -38,15 +44,13 @@ public class VistaMisionPizarra extends JDialog {
         setUndecorated(true); 
         
         JPanel panelFondo = new JPanel();
-        panelFondo.setBackground(new Color(34, 76, 46)); // Verde pizarra
+        panelFondo.setBackground(new Color(34, 76, 46));
         panelFondo.setLayout(null);
-        panelFondo.setBorder(BorderFactory.createLineBorder(new Color(101, 67, 33), 15)); // Marco de madera
+        panelFondo.setBorder(BorderFactory.createLineBorder(new Color(101, 67, 33), 15)); 
         setContentPane(panelFondo);
 
-        // --- 1. LEER EL ARCHIVO XML ---
         cargarPreguntasXML();
 
-        // --- 2. CONFIGURAR INTERFAZ ---
         JButton btnCerrar = new JButton("X");
         btnCerrar.setBounds(730, 20, 50, 40);
         btnCerrar.setBackground(Color.RED);
@@ -56,9 +60,9 @@ public class VistaMisionPizarra extends JDialog {
         btnCerrar.addActionListener(e -> dispose());
         panelFondo.add(btnCerrar);
 
-        JLabel lblTitulo = new JLabel("EXAMEN DE PIZARRA (Responde 3 seguidas)", SwingConstants.CENTER);
+        JLabel lblTitulo = new JLabel(starina_among_us.modelo.GestorLenguaje.get("lbl_quiz_titulo"), SwingConstants.CENTER);
         lblTitulo.setForeground(Color.WHITE);
-        lblTitulo.setFont(new Font("Comic Sans MS", Font.BOLD, 24)); // Estilo tiza
+        lblTitulo.setFont(new Font("Comic Sans MS", Font.BOLD, 24)); 
         lblTitulo.setBounds(50, 40, 700, 30);
         panelFondo.add(lblTitulo);
 
@@ -83,56 +87,53 @@ public class VistaMisionPizarra extends JDialog {
         panelFondo.add(btnOp2);
         panelFondo.add(btnOp3);
 
-        cargarSiguientePregunta();
+        reiniciarQuiz();
     }
 
+    /**
+     * Accede al sistema de archivos local y parsea las etiquetas del archivo XML de
+     * preguntas para popular la lista de juego.
+     */
     private void cargarPreguntasXML() {
         try {
-            InputStream is = getClass().getResourceAsStream("/starina_among_us/recursos/misiones/quiz_math.xml");
+            String idiomaActual = starina_among_us.modelo.GestorConfiguracion.idioma;
+            String rutaArchivo = "/starina_among_us/recursos/misiones/quiz_math_" + idiomaActual + ".xml";
+            InputStream is = getClass().getResourceAsStream(rutaArchivo);
+            
             if (is == null) {
-                System.out.println("❌ Error: No se encontró quiz_math.xml");
-                return;
+                System.out.println("No se encontro archivo de idioma. Cargando el espanol por defecto...");
+                is = getClass().getResourceAsStream("/starina_among_us/recursos/misiones/quiz_math_es.xml");
             }
             
-            // Motores nativos de Java para interpretar XML
             DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
             DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
             Document doc = dBuilder.parse(is);
             doc.getDocumentElement().normalize();
 
-            // Buscar todas las etiquetas <pregunta>
             NodeList nList = doc.getElementsByTagName("pregunta");
             
             for (int temp = 0; temp < nList.getLength(); temp++) {
                 Node nNode = nList.item(temp);
                 if (nNode.getNodeType() == Node.ELEMENT_NODE) {
                     Element elemento = (Element) nNode;
-                    
                     String txt = elemento.getElementsByTagName("texto").item(0).getTextContent();
                     String correcta = elemento.getElementsByTagName("correcta").item(0).getTextContent();
                     String falsa1 = elemento.getElementsByTagName("falsa1").item(0).getTextContent();
                     String falsa2 = elemento.getElementsByTagName("falsa2").item(0).getTextContent();
-                    
                     bancoPreguntas.add(new Pregunta(txt, correcta, falsa1, falsa2));
                 }
             }
-            System.out.println("✅ Se cargaron " + bancoPreguntas.size() + " preguntas del XML.");
-            
         } catch (Exception e) {
-            System.out.println("❌ Excepción leyendo XML: " + e.getMessage());
+            System.out.println("Excepcion leyendo XML: " + e.getMessage());
             e.printStackTrace();
         }
     }
-    
     
     private void reiniciarQuiz() {
         rachaCorrectas = 0;
         indicePreguntaActual = 0;
         barraProgreso.setValue(0);
-        
-        // REVOLVEMOS EL MAZO UNA SOLA VEZ AQUÍ
         Collections.shuffle(bancoPreguntas); 
-        
         cargarSiguientePregunta();
     }
 
@@ -142,7 +143,6 @@ public class VistaMisionPizarra extends JDialog {
         btn.setFont(new Font("Arial", Font.BOLD, 20));
         btn.setBackground(Color.WHITE);
         btn.setFocusPainted(false);
-        // Ajustamos texto largo para que baje de línea si es necesario
         btn.setMargin(new Insets(10, 10, 10, 10)); 
         
         btn.addActionListener(e -> verificarRespuesta(btn.getText()));
@@ -152,20 +152,17 @@ public class VistaMisionPizarra extends JDialog {
     private void cargarSiguientePregunta() {
         if (bancoPreguntas.isEmpty()) return;
 
-        // Por si acaso llegamos al final de la lista, volvemos a revolver
         if (indicePreguntaActual >= bancoPreguntas.size()) {
             Collections.shuffle(bancoPreguntas);
             indicePreguntaActual = 0;
         }
 
-        // Sacamos la pregunta en orden y avanzamos el índice para la próxima
         Pregunta p = bancoPreguntas.get(indicePreguntaActual);
         indicePreguntaActual++; 
         
         respuestaCorrectaActual = p.correcta;
         labelPregunta.setText(p.texto);
 
-        // Revolvemos solo los botones de esta pregunta
         ArrayList<String> opciones = new ArrayList<>();
         opciones.add(p.correcta);
         opciones.add(p.falsa1);
@@ -177,6 +174,11 @@ public class VistaMisionPizarra extends JDialog {
         btnOp3.setText("<html><center>" + opciones.get(2) + "</center></html>");
     }
 
+    /**
+     * Valida el texto del boton presionado contra la respuesta guardada
+     * y controla el aumento de la racha de aciertos.
+     * * @param respuestaHTML La opcion seleccionada.
+     */
     private void verificarRespuesta(String respuestaHTML) {
         String respuestaElegida = respuestaHTML.replace("<html><center>", "").replace("</center></html>", "");
         
@@ -185,25 +187,25 @@ public class VistaMisionPizarra extends JDialog {
             barraProgreso.setValue(rachaCorrectas);
             
             if (rachaCorrectas >= 3) {
-                System.out.println("✅ ¡Examen aprobado!");
+                System.out.println("Examen aprobado.");
                 panelPadre.completarMisionPizarra();
                 dispose();
             } else {
-                cargarSiguientePregunta(); // Sacamos el siguiente papelito del mazo
+                cargarSiguientePregunta(); 
             }
         } else {
-            System.out.println("❌ ¡Incorrecto! Volviendo a empezar...");
-            
-            // Efecto visual rojo de error
+            System.out.println("Incorrecto. Volviendo a empezar...");
             getContentPane().setBackground(new Color(150, 50, 50));
             Timer t = new Timer(200, e -> getContentPane().setBackground(new Color(34, 76, 46)));
             t.setRepeats(false);
             t.start();
-            
-            reiniciarQuiz(); // <-- REINICIAMOS EL MAZO AL EQUIVOCARNOS
+            reiniciarQuiz(); 
         }
     }
 
+    /**
+     * Clase de datos interna para guardar el formato estandar de una pregunta del quiz.
+     */
     class Pregunta {
         String texto, correcta, falsa1, falsa2;
         public Pregunta(String t, String c, String f1, String f2) {

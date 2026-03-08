@@ -1,17 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <idioma nombre="English">
-    <menu_principal>
-        <btn_online>ONLINE</btn_online>
-        <btn_howtoplay>HOW TO PLAY</btn_howtoplay>
-        <btn_freeplay>FREEPLAY</btn_freeplay>
-        <lbl_nombre>Your Name:</lbl_nombre>
-        <lbl_ip>Server IP:</lbl_ip>
-    </menu_principal>
-    <ajustes>
-        <titulo>SETTINGS</titulo>
-        <antialiasing>Antialiasing</antialiasing>
-        <musica>Music Volume</musica>
-        <sfx>SFX Volume</sfx>
-        <idioma_actual>Language</idioma_actual>
-    </ajustes>
+    <lbl_nombre>YOUR NAME:</lbl_nombre>
+    <lbl_color>SUIT COLOR:</lbl_color>
+    <lbl_mapa>MAP (Only affects HOST):</lbl_mapa>
+    <lbl_ip>SERVER IP:</lbl_ip>
+    <btn_host>HOST</btn_host>
+    <btn_join>JOIN</btn_join>
+    <btn_atras>◄ BACK</btn_atras>
+    <lbl_rol>SELECT YOUR ROLE:</lbl_rol>
+    <lbl_sel_mapa>SELECT A MAP TO EXPLORE:</lbl_sel_mapa>
+    <btn_cerrar>CLOSE</btn_cerrar>
+
+    <btn_esperando>WAITING FOR PLAYERS...</btn_esperando>
+    <btn_iniciar>START GAME!</btn_iniciar>
+    <btn_faltan>Not enough players...</btn_faltan>
+    <lbl_sala>WAITING ROOM</lbl_sala>
+    <lbl_conectados>Players connected:</lbl_conectados>
+    <lbl_esperando_host>Waiting for Host to start...</lbl_esperando_host>
+    <lbl_espectando>SPECTATING:</lbl_espectando>
+    <lbl_reiniciando>REBOOTING SERVER...</lbl_reiniciando>
+    <lbl_apagando>SHUTTING DOWN...</lbl_apagando>
+    
+    <lbl_quien_es>Who Is The Impostor?</lbl_quien_es>
+    <lbl_voto_termina>Voting Ends In:</lbl_voto_termina>
+    <lbl_voto_fin>Voting Ended.</lbl_voto_fin>
+    <lbl_fue_expulsado>was ejected.</lbl_fue_expulsado>
+    <lbl_nadie_expulsado>No one was ejected. (Tie / Skipped)</lbl_nadie_expulsado>
+    <lbl_ganan_imp>IMPOSTORS Win</lbl_ganan_imp>
+    <lbl_ganan_trip>CREWMATES Win</lbl_ganan_trip>
+    <lbl_ganan_tareas>TASK VICTORY! Crewmates Win</lbl_ganan_tareas>
+    <btn_rol_tripulante>ROLE: CREWMATE</btn_rol_tripulante>
+    <btn_rol_impostor>ROLE: IMPOSTOR</btn_rol_impostor>
+    <lbl_musica>MUSIC</lbl_musica>
+    <lbl_efectos>SOUND EFFECTS (SFX)</lbl_efectos>
+    <chk_aa>ANTIALIASING (AA)</chk_aa>
+    <btn_mapa_uni>MAP: UNI</btn_mapa_uni>
+    <btn_mapa_salones>MAP: SALONES</btn_mapa_salones>
+    <lbl_quiz_titulo>CHALKBOARD EXAM (Answer 3 in a row)</lbl_quiz_titulo>
+    <lbl_pc_titulo>CENTRAL SYSTEM (Enter the password)</lbl_pc_titulo>
+    <btn_kill_fall>KILL</btn_kill_fall>
+    <btn_report_fall>REPORT</btn_report_fall>
+    <lbl_pc_titulo>CENTRAL SYSTEM (Enter the password)</lbl_pc_titulo>
+    <lbl_oficina_titulo>SORT PAPERS (Drag them in order)</lbl_oficina_titulo>
+    <lbl_biblio_titulo>LIBRARY (Sort the books)</lbl_biblio_titulo>
+    
+    <lbl_pc_ingrese>Enter Password:</lbl_pc_ingrese>
+    <lbl_pc_concedido>ACCESS GRANTED</lbl_pc_concedido>
+    <lbl_pc_apagando>SHUTTING DOWN...</lbl_pc_apagando>
+    <lbl_pc_denegado>ACCESS DENIED</lbl_pc_denegado>
+    
+    <lbl_oficina_titulo>Sort Final Paper (Drag and Drop)</lbl_oficina_titulo>
+    <lbl_oficina_pag>Pg</lbl_oficina_pag>
+    
+    <lbl_biblio_fase1>PHASE 1: Sort books Alphabetically (A - Z)</lbl_biblio_fase1>
+    <lbl_biblio_fase2>PHASE 2: Now sort by Rating (Lowest to Highest)</lbl_biblio_fase2>
+    
+    <lbl_impostores>NUMBER OF IMPOSTORS (Host only):</lbl_impostores>
+    
+    <msg_mapa_error>Error: The Host is playing on map: </msg_mapa_error>
+    <msg_mapa_titulo>Incorrect Map</msg_mapa_titulo>
+    
+    <lbl_how_to_title>HOW TO PLAY</lbl_how_to_title>
+    <msg_how_to_body>• Use ARROW KEYS or WASD to move.&#10;• As CREWMATE: Complete tasks (USE button) to win.&#10;• As IMPOSTOR: Eliminate crewmates unseen and sabotage vision.&#10;• Report bodies or call meetings to eject the impostor.</msg_how_to_body>
+
+    <lbl_about_title>ABOUT</lbl_about_title>
+    <msg_about_body>IDE: Apache Netbeans 27&#10;Libraries: Swing, AWT, Java Sound API&#10;Current Version: 1.0.0&#10;Developers: WuLliBer Yepez, Carlos Ramirez,&#10;Samuel Salazar, Jorg Sierra </msg_about_body>
+    <msg_sala_llena>You cannot join. The room is currently full (10/10).</msg_sala_llena>
+    
+    <lbl_estanteria_fase1>FASE 1/3: ORDENA DEL 1 AL 10</lbl_estanteria_fase1>
+    <lbl_estanteria_fase2>FASE 2/3: ORDENA DEL 10 AL 1</lbl_estanteria_fase2>
+    <lbl_estanteria_fase3>FASE 3/3: ORDEN ALEATORIO</lbl_estanteria_fase3>
 </idioma>

@@ -7,6 +7,13 @@ import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 import starina_among_us.modelo.HerramientasImagen;
 
+/**
+ * Ventana emergente interactiva para la tarea de apagar la PC.
+ * Simula una terminal de computadora donde el jugador debe ingresar
+ * un codigo de acceso mediante el teclado fisico para apagar el sistema.
+ * * @author Wulliber Yepez, Carlos Ramirez, Jorg Sierra, Samuel Salazar
+ * @version 1.0
+ */
 public class VistaMisionPC extends JDialog {
 
     private boolean completada = false;
@@ -15,8 +22,12 @@ public class VistaMisionPC extends JDialog {
     private BufferedImage imgTeclado;
     
     private boolean verificando = false;
-    private String mensajePantalla = "Ingrese Contraseña:";
+    private String mensajePantalla = starina_among_us.modelo.GestorLenguaje.get("lbl_pc_ingrese");
 
+    /**
+     * Constructor principal del minijuego de la PC interactiva.
+     * * @param padre Panel principal del juego para sincronizacion modal.
+     */
     public VistaMisionPC(PanelJuego padre) {
         super(SwingUtilities.getWindowAncestor(padre), "Apagar PC", Dialog.ModalityType.APPLICATION_MODAL);
         
@@ -24,18 +35,12 @@ public class VistaMisionPC extends JDialog {
         setLocationRelativeTo(padre);
         setUndecorated(true);
 
-        // --- CARGAR Y RECORTAR LA IMAGEN CON TU HERRAMIENTA ---
         try {
             BufferedImage imgOriginal = ImageIO.read(getClass().getResource("/starina_among_us/recursos/misiones/pc.png"));
-            
-            // Recorte 1: Pantalla (X=0, Y=0, Ancho=505, Alto=361)
             imgPantalla = HerramientasImagen.recortar(imgOriginal, 0, 0, 505, 361);
-            
-            // Recorte 2: Teclado y Ratón (X=506, Y=0, Ancho=597, Alto=174)
             imgTeclado = HerramientasImagen.recortar(imgOriginal, 506, 0, 597, 174);
-            
         } catch (Exception e) {
-            System.out.println("❌ Error cargando o recortando pc.png: " + e.getMessage());
+            System.out.println("Error cargando o recortando pc.png: " + e.getMessage());
         }
 
         JPanel panelFondo = new JPanel() {
@@ -59,7 +64,6 @@ public class VistaMisionPC extends JDialog {
                     g2.drawImage(imgTeclado, tecladoX, tecladoY, null);
                 }
 
-                // Texto en la pantalla
                 g2.setColor(new Color(50, 255, 50)); 
                 g2.setFont(new Font("Monospaced", Font.BOLD, 22));
                 g2.drawString(mensajePantalla, pantallaX + 50, pantallaY + 140);
@@ -72,7 +76,6 @@ public class VistaMisionPC extends JDialog {
         panelFondo.setLayout(null);
         setContentPane(panelFondo);
 
-        // --- LÓGICA DEL TECLADO FÍSICO ---
         panelFondo.setFocusable(true);
         panelFondo.addKeyListener(new KeyAdapter() {
             @Override
@@ -109,7 +112,6 @@ public class VistaMisionPC extends JDialog {
             public void mousePressed(MouseEvent e) { panelFondo.requestFocusInWindow(); }
         });
 
-        // Botón Salir
         JButton btnCerrar = new JButton("X");
         btnCerrar.setBounds(630, 20, 50, 40);
         btnCerrar.setBackground(Color.RED);
@@ -122,13 +124,16 @@ public class VistaMisionPC extends JDialog {
         SwingUtilities.invokeLater(() -> panelFondo.requestFocusInWindow());
     }
 
+    /**
+     * Valida la contrasena ingresada por el jugador contra el pin de seguridad.
+     * Muestra retroalimentacion visual de acuerdo al resultado.
+     */
     private void verificarPassword() {
         verificando = true; 
         
-        // Verifica si escribiste "Starina"
         if (pinIngresado.equalsIgnoreCase("Starina")) {
-            mensajePantalla = "ACCESO CONCEDIDO";
-            pinIngresado = "APAGANDO...";
+            mensajePantalla = starina_among_us.modelo.GestorLenguaje.get("lbl_pc_concedido");
+            pinIngresado = starina_among_us.modelo.GestorLenguaje.get("lbl_pc_apagando");
             completada = true; 
             starina_among_us.modelo.GestorSonido.jugar("general_sounds/UI_Select.wav"); 
             
@@ -136,12 +141,12 @@ public class VistaMisionPC extends JDialog {
             t.setRepeats(false);
             t.start();
         } else {
-            mensajePantalla = "ACCESO DENEGADO";
+            mensajePantalla = starina_among_us.modelo.GestorLenguaje.get("lbl_pc_denegado");
             pinIngresado = "";
             starina_among_us.modelo.GestorSonido.jugar("general_sounds/Alarm_sabotage.wav"); 
             
             Timer t = new Timer(1000, e -> {
-                mensajePantalla = "Ingrese Contraseña:";
+                mensajePantalla = starina_among_us.modelo.GestorLenguaje.get("lbl_pc_ingrese");
                 verificando = false; 
                 repaint();
             });
@@ -150,5 +155,8 @@ public class VistaMisionPC extends JDialog {
         }
     }
 
+    /**
+     * @return El estado de resolucion de la mision.
+     */
     public boolean isCompletada() { return completada; }
 }
